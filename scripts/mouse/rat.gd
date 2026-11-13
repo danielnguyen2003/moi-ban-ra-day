@@ -84,7 +84,10 @@ func _physics_process(dt: float) -> void:
 		_climb(dt, input)
 	else:
 		_ground(dt, input, speed)
+	var pre_vel := velocity
 	move_and_slide()
+	if not climbing:
+		_try_step_up(pre_vel)
 	_check_start_climb(input)
 	_footsteps(dt)
 	_animate(dt)
@@ -112,6 +115,25 @@ func _ground(dt: float, input: Vector2, speed: float) -> void:
 	if is_on_floor() and not _was_on_floor:
 		NoiseBus.emit_noise(global_position, 6.0 * _surface_mult(), self)
 	_was_on_floor = is_on_floor()
+
+const STEP_HEIGHT := 0.75   ## ~7 cm: thresholds of porches and brick edges
+
+## A rat pops up over low ledges without jumping.
+func _try_step_up(pre_vel: Vector3) -> void:
+	var hv := Vector3(pre_vel.x, 0, pre_vel.z)
+	if not is_on_floor() or not is_on_wall() or hv.length() < 0.5:
+		return
+	var fwd := hv.normalized() * 0.25
+	var t := global_transform
+	if test_move(t, Vector3.UP * STEP_HEIGHT):
+		return  # no headroom
+	t.origin += Vector3.UP * STEP_HEIGHT
+	if test_move(t, fwd):
+		return  # still blocked: it's a real wall
+	t.origin += fwd
+	var col := KinematicCollision3D.new()
+	if test_move(t, Vector3.DOWN * STEP_HEIGHT, col):
+		global_position = t.origin + col.get_travel()
 
 func _check_start_climb(input: Vector2) -> void:
 	if climbing or input.y > -0.3:
