@@ -37,6 +37,7 @@ func _ready() -> void:
 	_spawn()
 	hud = Hud.new()
 	add_child(hud)
+	_audio()
 	GameState.player_caught.connect(_on_caught)
 	GameState.objective_changed.emit("Tìm hộp diêm — trên nóc tủ chè, sát tường bên phải gian thờ.")
 
@@ -311,6 +312,58 @@ func _spawn() -> void:
 	var pts: Array[Vector3] = [Vector3(-6, 0, -8), Vector3(5, 0, -10), Vector3(10, 0, 4), Vector3(4, 0, 17), Vector3(-6, 0, 15), Vector3(-1, 0, 2)]
 	cat.set_patrol(pts)
 	cat.state_changed.connect(func(s): if s == CatBrain.State.CHASE and rat.camera_rig: rat.camera_rig.shake = 1.5)
+
+# ---------------------------------------------------------------- audio
+const SND_NIGHT := "res://assets/audio/commons/night_rain_sea/night_rain_sea.ogg"
+const SND_HISS := "res://assets/audio/commons/cat_hiss/cat_hiss.wav"
+const SND_CREAK := "res://assets/audio/commons/door_creak/door_creak.ogg"
+var _creak: AudioStreamPlayer3D
+var _creak_cd := 0.0
+
+func _audio() -> void:
+	# Night bed: rain and insects (field recording, Chiang Mai), heard through the walls.
+	var night := AudioStreamPlayer.new()
+	var st := load(SND_NIGHT) as AudioStreamOggVorbis
+	if st:
+		st.loop = true
+		night.stream = st
+		night.volume_db = -16.0
+		add_child(night)
+		night.play()
+	# Cat hisses when a chase begins.
+	var hiss := AudioStreamPlayer3D.new()
+	hiss.stream = load(SND_HISS)
+	hiss.unit_size = 20.0
+	hiss.max_distance = 120.0
+	hiss.volume_db = -2.0
+	cat.add_child(hiss)
+	hiss.position = Vector3(0, 2.0, -2.0)
+	cat.state_changed.connect(func(s): if s == CatBrain.State.CHASE: hiss.play())
+	# The ajar door panel creaks when the rat squeezes past — and the cat hears it.
+	_creak = AudioStreamPlayer3D.new()
+	_creak.stream = load(SND_CREAK)
+	_creak.unit_size = 15.0
+	_creak.volume_db = -6.0
+	_creak.position = Vector3(4.5, 2.0, 26.0)
+	add_child(_creak)
+	var door := Area3D.new()
+	door.collision_layer = 0
+	door.collision_mask = GameState.L_MOUSE
+	door.position = Vector3(4.5, 1.0, 26.0)
+	var cs := CollisionShape3D.new(); var sh := BoxShape3D.new(); sh.size = Vector3(3.0, 2.0, 2.0)
+	cs.shape = sh; door.add_child(cs)
+	add_child(door)
+	door.body_entered.connect(_on_door_passed)
+
+func _on_door_passed(body: Node) -> void:
+	if body is Rat and _creak_cd <= 0.0:
+		_creak_cd = 15.0
+		_creak.pitch_scale = randf_range(0.85, 1.1)
+		_creak.play()
+		NoiseBus.emit_noise(_creak.global_position, 30.0, _creak)
+
+func _physics_process(dt: float) -> void:
+	_creak_cd = maxf(0.0, _creak_cd - dt)
 
 func _on_caught() -> void:
 	if hud.fading:
