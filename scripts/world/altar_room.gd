@@ -47,10 +47,10 @@ func _environment() -> void:
 	env.background_mode = Environment.BG_COLOR
 	env.background_color = Color(0.004, 0.005, 0.009)
 	env.ambient_light_source = Environment.AMBIENT_SOURCE_COLOR
-	env.ambient_light_color = Color(0.09, 0.1, 0.14)
-	env.ambient_light_energy = 0.45
+	env.ambient_light_color = Color(0.2, 0.19, 0.22)
+	env.ambient_light_energy = 0.9
 	env.tonemap_mode = Environment.TONE_MAPPER_AGX
-	env.tonemap_exposure = 1.7
+	env.tonemap_exposure = 2.6
 	env.ssao_enabled = true
 	env.ssao_radius = 2.0
 	env.ssao_intensity = 2.5
@@ -64,6 +64,17 @@ func _environment() -> void:
 	env.volumetric_fog_length = 120.0
 	we.environment = env
 	add_child(we)
+	_env = env
+	_apply_brightness(GameState.brightness)
+	GameState.brightness_changed.connect(_apply_brightness)
+
+var _env: Environment
+const BASE_EXPOSURE := 3.0
+const BASE_AMBIENT := 1.6
+
+func _apply_brightness(v: float) -> void:
+	_env.tonemap_exposure = BASE_EXPOSURE * v
+	_env.ambient_light_energy = BASE_AMBIENT * v
 
 # ---------------------------------------------------------------- house shell
 func _architecture() -> void:
@@ -205,6 +216,17 @@ func _lights() -> void:
 	fmat.emission = Color(1.0, 0.6, 0.25); fmat.emission_energy_multiplier = 6.0
 	flame.mesh = fm; flame.material_override = fmat; flame.position = Vector3(6.5, 13.0, -22.5)
 	add_child(flame)
+	# Visibility fill (not in "game_lights": does not affect the cat's detection of the rat).
+	for p in [Vector3(0, 30, -8), Vector3(0, 30, 14)]:
+		var fill := OmniLight3D.new()
+		fill.light_color = Color(0.85, 0.75, 0.65)
+		fill.light_energy = 1.2
+		fill.omni_range = 60.0
+		fill.omni_attenuation = 0.8
+		fill.shadow_enabled = false
+		fill.light_volumetric_fog_energy = 0.0
+		fill.position = p
+		add_child(fill)
 	# Failing fluorescent tube on the right wall (pale green).
 	var tube := SpotLight3D.new()
 	tube.name = "TubeLight"
@@ -259,6 +281,20 @@ func _gameplay() -> void:
 	dz.incense = incense
 	dz.ember = ember
 	add_child(dz)
+	_beacon = OmniLight3D.new()
+	_beacon.light_color = Color(1.0, 0.8, 0.5)
+	_beacon.omni_range = 4.0
+	_beacon.light_energy = 0.0
+	_beacon.shadow_enabled = false
+	_beacon.position = Vector3(0, 13.0, -22.0)
+	add_child(_beacon)
+
+var _beacon: OmniLight3D
+
+func _process(_dt: float) -> void:
+	if rat and _beacon:
+		var want := rat.carrying != null and not incense.lit
+		_beacon.light_energy = (0.6 + 0.3 * sin(Time.get_ticks_msec() * 0.004)) if want else 0.0
 
 func _spawn() -> void:
 	rat = Rat.new()

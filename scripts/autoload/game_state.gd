@@ -21,6 +21,10 @@ signal item_collected(item_id: String)
 var checkpoint := Transform3D.IDENTITY
 var inventory: Array[String] = []
 var reduce_flicker := false
+## Player brightness multiplier (keys - and =), saved in user://settings.cfg.
+var brightness := 1.0
+signal brightness_changed(v: float)
+const SETTINGS := "user://settings.cfg"
 
 func _ready() -> void:
 	_bind("move_forward", [KEY_W, KEY_UP])
@@ -32,6 +36,11 @@ func _ready() -> void:
 	_bind("interact", [KEY_E])
 	_bind("toggle_fps", [KEY_F3])
 	_bind("ui_cancel_game", [KEY_ESCAPE])
+	_bind("brightness_down", [KEY_MINUS, KEY_KP_SUBTRACT])
+	_bind("brightness_up", [KEY_EQUAL, KEY_KP_ADD])
+	var cfg := ConfigFile.new()
+	if cfg.load(SETTINGS) == OK:
+		brightness = float(cfg.get_value("video", "brightness", 1.0))
 	if "--capture" in OS.get_cmdline_user_args():
 		add_child.call_deferred(load("res://tools/capture_shots.gd").new())
 
@@ -55,3 +64,16 @@ func has_item(item_id: String) -> bool:
 
 func reset_run() -> void:
 	inventory.clear()
+
+func _unhandled_input(e: InputEvent) -> void:
+	if e.is_action_pressed("brightness_up"):
+		set_brightness(brightness + 0.1)
+	elif e.is_action_pressed("brightness_down"):
+		set_brightness(brightness - 0.1)
+
+func set_brightness(v: float) -> void:
+	brightness = clampf(snappedf(v, 0.1), 0.5, 2.0)
+	brightness_changed.emit(brightness)
+	var cfg := ConfigFile.new()
+	cfg.set_value("video", "brightness", brightness)
+	cfg.save(SETTINGS)

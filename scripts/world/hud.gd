@@ -33,7 +33,7 @@ func _ready() -> void:
 	prompt.add_theme_color_override("font_color", Color(1.0, 0.93, 0.78, 0.95))
 	controls = _label(Vector2(0.03, 0.72), 18, HORIZONTAL_ALIGNMENT_LEFT)
 	controls.add_theme_color_override("font_color", Color(0.85, 0.82, 0.75, 0.85))
-	controls.text = "W A S D — đi      Chuột — nhìn      Shift — chạy (ồn)\nSpace — nhảy      E — ngậm / đặt đồ      Đi thẳng vào cột, chân sập, tủ chè, dây thừng để leo\nĐứng yên dưới gầm sập, sau chum, trong ổ rơm để nấp      Esc — thả chuột máy tính"
+	controls.text = "W A S D — đi      Chuột — nhìn      Shift — chạy (ồn)\nSpace — nhảy      E — ngậm / đặt đồ      − / = — độ sáng\nĐi thẳng vào cột, chân sập, tủ chè, dây thừng để leo\nĐứng yên dưới gầm sập, sau chum, trong ổ rơm để nấp      Esc — thả chuột máy tính"
 	fade = ColorRect.new()
 	fade.color = Color(0, 0, 0, 0)
 	fade.set_anchors_preset(Control.PRESET_FULL_RECT)
@@ -41,6 +41,7 @@ func _ready() -> void:
 	add_child(fade)
 	Director.rhyme_line.connect(func(t): subtitle.text = ("“%s”" % t) if t != "" else "")
 	GameState.objective_changed.connect(func(t): objective.text = t)
+	GameState.brightness_changed.connect(func(v): _flash("Độ sáng: %d%%" % roundi(v * 100)))
 
 func _label(anchor: Vector2, size: int, align: HorizontalAlignment) -> Label:
 	var l := Label.new()
@@ -89,3 +90,9 @@ func fade_in() -> void:
 
 func show_ending() -> void:
 	subtitle.text = "Bản thử M1 — hết. (Cảm ơn bạn đã chơi.)"
+
+func _flash(t: String) -> void:
+	subtitle.text = t
+	await get_tree().create_timer(1.5).timeout
+	if subtitle.text == t:
+		subtitle.text = ""
