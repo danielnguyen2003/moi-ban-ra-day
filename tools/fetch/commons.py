@@ -16,7 +16,7 @@ def main(title, slug, kind="audio"):
     if not re.search(r"CC0|Public domain|^CC BY(-SA)? [0-9.]+$|^CC BY(-SA)?$", lic, re.I):  # BY-SA: file stays BY-SA, credited
         sys.exit(f"refusing {title}: license {lic!r}")
     artist = re.sub("<[^>]+>", "", meta.get("Artist", {}).get("value", "unknown")).strip()
-    ext = os.path.splitext(ii["url"])[1].lower()
+    ext = os.path.splitext(urllib.parse.urlparse(ii["url"]).path)[1].lower()
     sub = ("audio", "commons") if kind == "audio" else ("refs", "_cache")
     out = os.path.join(ROOT, "assets", *sub, slug) if kind == "audio" else os.path.join(ROOT, "refs", "_cache", slug)
     download(ii["url"], os.path.join(out, slug + ext))

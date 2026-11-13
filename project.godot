@@ -16,7 +16,7 @@ Director="*res://scripts/autoload/director.gd"
 [game]
 
 version_base="m1.3"
-update_manifest_url="https://github.com/danielnguyen2003/moi-ban-ra-day/releases/download/updates/manifest.json"
+update_manifest_url="https://raw.githubusercontent.com/danielnguyen2003/moi-ban-ra-day/main/updates/manifest.json"
 
 [display]
 window/size/viewport_width=1920

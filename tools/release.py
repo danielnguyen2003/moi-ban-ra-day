@@ -1,9 +1,9 @@
 """Release tool: full builds once, then tiny patch packs for the in-game updater (F9).
   python3 tools/release.py base            # export full Win+Linux builds for game/version_base
   python3 tools/release.py patch "notes"   # export a diff pack vs base + earlier patches
-  python3 tools/release.py publish         # upload to GitHub release "updates" (needs gh auth)
-State lives in build/release/ (manifest.json, base.pck, patch-*.pck); base.pck is also uploaded
-so a fresh machine can rebuild patches: python3 tools/release.py fetch
+  python3 tools/release.py publish         # copy manifest + patches to updates/ and git push
+  python3 tools/release.py fetch           # fresh machine: restore build/release from updates/ + base commit
+`base` must run on a clean, committed tree: the manifest records HEAD as base_commit.
 """
 import hashlib, json, os, re, shutil, subprocess, sys, tarfile, zipfile
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
@@ -48,7 +48,8 @@ def base():
             z.write(os.path.join(w, f), f"MoiBanRaDay/{f}")
     with tarfile.open(os.path.join(REL, lz), "w:gz") as t:
         t.add(l, "MoiBanRaDay")
-    save({"base": bid, "full": {"windows": wz, "linux": lz}, "base_pck": "base.pck",
+    commit = subprocess.run(["git", "rev-parse", "HEAD"], cwd=ROOT, capture_output=True, text=True).stdout.strip()
+    save({"base": bid, "base_commit": commit, "full": {"windows": wz, "linux": lz}, "base_pck": "base.pck",
           "base_sha256": sha(os.path.join(REL, "base.pck")), "patches": []})
     print("base", bid, "ready in", REL)
 
@@ -64,18 +65,34 @@ def patch(notes=""):
     save(m)
     print(f"{name}: {os.path.getsize(p) / 1024:.1f} KB")
 
+UPD = os.path.join(ROOT, "updates")   # committed: manifest.json + patch-*.pck, served by raw.githubusercontent.com
+
 def publish():
+    """Copy manifest + patches into updates/ and push. Full builds are handed out once, outside git."""
     m = load()
-    files = [MAN, os.path.join(REL, "base.pck")] + [os.path.join(REL, p["file"]) for p in m["patches"]]
-    files += [os.path.join(REL, f) for f in m["full"].values()]
-    if subprocess.run(["gh", "release", "view", TAG, "-R", REPO], capture_output=True).returncode != 0:
-        run("gh", "release", "create", TAG, "-R", REPO, "--title", "Bản cập nhật (Updates)",
-            "--notes", "Tải bản đầy đủ một lần; sau đó bấm F9 trong game để nhận bản vá.", "--latest")
-    run("gh", "release", "upload", TAG, "-R", REPO, "--clobber", *[f for f in files if os.path.exists(f)])
+    os.makedirs(UPD, exist_ok=True)
+    shutil.copy(MAN, os.path.join(UPD, "manifest.json"))
+    for p in m["patches"]:
+        shutil.copy(os.path.join(REL, p["file"]), os.path.join(UPD, p["file"]))
+    run("git", "add", "updates")
+    msg = f"Publish updates for {m['base']}: {len(m['patches'])} patch(es)"
+    if subprocess.run(["git", "diff", "--cached", "--quiet"], cwd=ROOT).returncode != 0:
+        run("git", "commit", "-m", msg + "\n\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>")
+    run("git", "-c", "push.negotiate=true", "push", "origin", "HEAD:main")
 
 def fetch():
+    """Rebuild build/release/ on a fresh machine: re-export base.pck from the recorded base commit."""
+    m = json.load(open(os.path.join(UPD, "manifest.json")))
     os.makedirs(REL, exist_ok=True)
-    run("gh", "release", "download", TAG, "-R", REPO, "-D", REL, "--clobber", "-p", "manifest.json", "-p", "base.pck", "-p", "patch-*.pck")
+    shutil.copy(os.path.join(UPD, "manifest.json"), MAN)
+    for p in m["patches"]:
+        shutil.copy(os.path.join(UPD, p["file"]), os.path.join(REL, p["file"]))
+    wt = os.path.join(ROOT, "build", "base_worktree")
+    shutil.rmtree(wt, ignore_errors=True)
+    run("git", "worktree", "add", "--force", wt, m["base_commit"])
+    subprocess.run([GODOT, "--headless", "--import"], cwd=wt)
+    subprocess.run([GODOT, "--headless", "--export-pack", "Linux", os.path.join(REL, "base.pck")], cwd=wt, check=True)
+    run("git", "worktree", "remove", "--force", wt)
 
 if __name__ == "__main__":
     {"base": base, "patch": patch, "publish": publish, "fetch": fetch}[sys.argv[1]](*sys.argv[2:])
