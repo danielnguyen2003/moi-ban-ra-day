@@ -40,9 +40,9 @@ func test_cat_catches_lit_rat_in_front_of_it() -> void:
 	var caught := [false]
 	GameState.player_caught.connect(func(): caught[0] = true)
 	# Put the rat in the lamp light a few metres ahead of the cat, cat facing it.
-	cat.global_position = Vector3(2, 0.2, 4)
+	cat.global_position = Vector3(2, 0.2, 9)
 	cat.rotation.y = 0.0                        # facing -Z
-	rat.global_position = Vector3(2, 0.5, -8)   # in the lamp's light (closer to the altar is in its shadow)
+	rat.global_position = Vector3(2, 0.5, -1)   # in the lamp light; nearer the altar is in its shadow
 	await wait_seconds(0.5)
 	assert_gt(rat.exposure, 0.2, "rat is lit by the oil lamp")
 	var states := []
