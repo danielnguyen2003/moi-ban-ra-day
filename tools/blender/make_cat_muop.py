@@ -1,4 +1,5 @@
 """Turn the CC-BY orange 'cat Walk' model into a grey-brown mèo mướp and clean it up.
+- removes self-illumination / metallic from the fur material
 - deletes the stray 2 m Icosphere and empty lamps shipped in the source
 - re-tints the orange fur (hue 10–50°) toward brown-grey tabby, deepens stripes; eyes untouched
 usage: blender -b -P tools/blender/make_cat_muop.py -- <in.glb> <out.glb>
@@ -46,6 +47,22 @@ def retint(img):
     img.pixels[:] = px.ravel()
     img.update()
 
+# Source material is fully self-illuminated (emissive = albedo) and 40 % metallic: fix to plain fur.
+for m in bpy.data.materials:
+    if not m.use_nodes:
+        continue
+    for n in m.node_tree.nodes:
+        if n.type == "BSDF_PRINCIPLED":
+            n.inputs["Metallic"].default_value = 0.0
+            n.inputs["Roughness"].default_value = 0.78
+            n.inputs["Emission Strength"].default_value = 0.0
+            for l in list(n.inputs["Emission Color"].links):
+                m.node_tree.links.remove(l)
+            n.inputs["Emission Color"].default_value = (0, 0, 0, 1)
+            bc = n.inputs["Base Color"]
+            for l in bc.links:
+                if l.from_node.type == "MIX" or l.from_node.type == "MIX_RGB":
+                    pass
 for im in bpy.data.images:
     if im.size[0] > 0:
         retint(im)

@@ -32,6 +32,8 @@ func _ready() -> void:
 	_bind("interact", [KEY_E])
 	_bind("toggle_fps", [KEY_F3])
 	_bind("ui_cancel_game", [KEY_ESCAPE])
+	if "--capture" in OS.get_cmdline_user_args():
+		add_child.call_deferred(load("res://tools/capture_shots.gd").new())
 
 func _bind(action: String, keys: Array) -> void:
 	if InputMap.has_action(action):

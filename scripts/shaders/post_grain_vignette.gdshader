@@ -22,7 +22,7 @@ void fragment() {
 	float r = length((uv - 0.5) * vec2(1.6, 1.0));
 	float vig_start = mix(0.75, 0.42, fear) - beat * 0.05 * fear;
 	float vig = smoothstep(vig_start + 0.5, vig_start, r);
-	col *= mix(0.15, 1.0, vig);
+	col *= mix(0.4, 1.0, vig);
 	float g = hash(uv * vec2(1920.0, 1080.0) + fract(time_s * 24.0) * 100.0) - 0.5;
 	col += g * grain_amount;
 	COLOR = vec4(col, 1.0);

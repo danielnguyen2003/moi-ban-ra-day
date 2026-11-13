@@ -11,7 +11,7 @@ var ember: OmniLight3D
 var hud: Hud
 
 const RAT_START := Vector3(4.0, 0.6, 33.0)
-const CAT_START := Vector3(-4.0, 0.2, 2.0)
+const CAT_START := Vector3(3.0, 0.2, -4.0)
 
 func _ready() -> void:
 	nav = NavigationRegion3D.new()
@@ -47,10 +47,10 @@ func _environment() -> void:
 	env.background_mode = Environment.BG_COLOR
 	env.background_color = Color(0.004, 0.005, 0.009)
 	env.ambient_light_source = Environment.AMBIENT_SOURCE_COLOR
-	env.ambient_light_color = Color(0.05, 0.06, 0.09)
-	env.ambient_light_energy = 0.12
+	env.ambient_light_color = Color(0.09, 0.1, 0.14)
+	env.ambient_light_energy = 0.45
 	env.tonemap_mode = Environment.TONE_MAPPER_AGX
-	env.tonemap_exposure = 1.1
+	env.tonemap_exposure = 1.7
 	env.ssao_enabled = true
 	env.ssao_radius = 2.0
 	env.ssao_intensity = 2.5
@@ -196,7 +196,7 @@ func _yard() -> void:
 # ---------------------------------------------------------------- lights
 func _lights() -> void:
 	# Oil lamp on the altar (~1800 K).
-	b.omni("OilLamp", Vector3(6.5, 13.6, -22.5), Color(1.0, 0.55, 0.22), 2.4, 30.0, true, "oil")
+	b.omni("OilLamp", Vector3(6.5, 13.6, -22.5), Color(1.0, 0.55, 0.22), 7.0, 48.0, true, "oil")
 	var flame := MeshInstance3D.new()
 	var fm := SphereMesh.new(); fm.radius = 0.18; fm.height = 0.6
 	var fmat := StandardMaterial3D.new()
@@ -211,7 +211,7 @@ func _lights() -> void:
 	tube.position = Vector3(17.6, 28, 4)
 	tube.rotation_degrees = Vector3(-50, 90, 0)
 	tube.light_color = Color(0.82, 1.0, 0.86)
-	tube.light_energy = 3.0
+	tube.light_energy = 6.0
 	tube.spot_range = 50.0
 	tube.spot_angle = 62.0
 	tube.shadow_enabled = true
@@ -227,8 +227,8 @@ func _lights() -> void:
 	# Full moon over the yard; only reaches inside through the ajar door.
 	var moon := DirectionalLight3D.new()
 	moon.light_color = Color(0.55, 0.66, 1.0)
-	moon.light_energy = 0.55
-	moon.rotation_degrees = Vector3(-32, 200, 0)
+	moon.light_energy = 1.1
+	moon.rotation_degrees = Vector3(-30, 15, 0)   # from the yard, through the ajar door
 	moon.shadow_enabled = true
 	moon.directional_shadow_max_distance = 140.0
 	moon.light_volumetric_fog_energy = 2.0
