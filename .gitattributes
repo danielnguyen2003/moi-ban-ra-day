@@ -1,0 +1,7 @@
+# Binary assets are stored as regular git objects (no LFS).
+*.png binary
+*.jpg binary
+*.glb binary
+*.ogg binary
+*.wav binary
+*.pck binary
