@@ -1,0 +1,11 @@
+{
+  "base": "m1.3",
+  "base_commit": "7447da265cf6e559343dcfc7a4e51f86bc135a22",
+  "full": {
+    "windows": "MoiBanRaDay-m1.3-windows-x86_64.zip",
+    "linux": "MoiBanRaDay-m1.3-linux-x86_64.tar.gz"
+  },
+  "base_pck": "base.pck",
+  "base_sha256": "38161a369640779a313d9e96294a0c2d44284140cd230a629a0e3d741a91041f",
+  "patches": []
+}
