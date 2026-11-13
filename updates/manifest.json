@@ -1,19 +1,11 @@
 {
-  "base": "m1.3",
-  "base_commit": "7447da265cf6e559343dcfc7a4e51f86bc135a22",
+  "base": "m2.0",
+  "base_commit": "2dd5f508d25e1cd2aef7d372b7478dac4dddab30",
   "full": {
-    "windows": "MoiBanRaDay-m1.3-windows-x86_64.zip",
-    "linux": "MoiBanRaDay-m1.3-linux-x86_64.tar.gz"
+    "windows": "MoiBanRaDay-m2.0-windows-x86_64.zip",
+    "linux": "MoiBanRaDay-m2.0-linux-x86_64.tar.gz"
   },
   "base_pck": "base.pck",
-  "base_sha256": "38161a369640779a313d9e96294a0c2d44284140cd230a629a0e3d741a91041f",
-  "patches": [
-    {
-      "id": "p1",
-      "file": "patch-0001.pck",
-      "sha256": "31bc21e20a9a85d671a8f7fc86c5771e8ea0032874fc2c66bfd5bb18aec516ad",
-      "size": 23172,
-      "notes": "Âm thanh: mưa đêm, mèo khè khi rượt, cửa kẽo kẹt"
-    }
-  ]
+  "base_sha256": "3a77cd3621c86edf3bf70df299e6392f0b94de9800c5856ea358711ed44e7b30",
+  "patches": []
 }
