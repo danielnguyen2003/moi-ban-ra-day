@@ -79,6 +79,21 @@ func nearest(p: Vector3, max_d: float):
 			best = d; out = pos[i]
 	return out
 
+## Catch every mouse within r of center (pounce shockwave, traps, owl). Returns how many.
+func catch_in(center: Vector3, r: float, by_player := false) -> int:
+	var n := 0
+	var i := 0
+	while i < pos.size():
+		if spawn_in[i] <= 0.0 and Vector2(pos[i].x - center.x, pos[i].z - center.z).length() < r + 0.2 * float(KINDS[kind[i]].scale):
+			hp[i] -= 1
+			if hp[i] <= 0:
+				caught.emit(pos[i], kind[i], by_player)
+				_remove(i)
+				n += 1
+				continue
+		i += 1
+	return n
+
 func _physics_process(dt: float) -> void:
 	var i := 0
 	while i < pos.size():

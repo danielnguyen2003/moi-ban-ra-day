@@ -27,8 +27,9 @@ var _fish_l: Label
 var _caught_l: Label
 var _combo_l: Label
 var _pounce_bar: ProgressBar
+var _pounce_l: Label
 var _time_l: Label
-var _shop_grid: GridContainer
+var _shop_grid: VBoxContainer
 var _shop_fish: Label
 var _sum_box: VBoxContainer
 var _restart_armed := false
@@ -191,21 +192,34 @@ func _build_hud() -> void:
 	_pounce_bar = ProgressBar.new(); _pounce_bar.show_percentage = false; _pounce_bar.custom_minimum_size = Vector2(160, 10)
 	_pounce_bar.set_anchors_preset(Control.PRESET_CENTER_BOTTOM); _pounce_bar.position += Vector2(-80, -40)
 	hud.add_child(_pounce_bar)
-	var pl := _lbl("Vồ  [Space]", 15, F_SEMI, Color(1, 1, 1, 0.7))
-	pl.set_anchors_preset(Control.PRESET_CENTER_BOTTOM); pl.position += Vector2(-42, -66)
-	hud.add_child(pl)
+	_pounce_l = _lbl("Vồ  [Space]", 15, F_SEMI, Color(1, 1, 1, 0.7))
+	_pounce_l.set_anchors_preset(Control.PRESET_CENTER_BOTTOM); _pounce_l.position += Vector2(-42, -66)
+	hud.add_child(_pounce_l)
 
 func show_hud() -> void:
 	_show_only(hud)
 
-func update_hud(time_left: float, total: float, caught: int, fish: float, combo: int, cool: float) -> void:
+func flash(t: String) -> void:
+	_combo_l.text = t
+	_combo_l.pivot_offset = _combo_l.size / 2
+	var tw := _combo_l.create_tween()
+	_combo_l.scale = Vector2.ONE * 1.4
+	tw.tween_property(_combo_l, "scale", Vector2.ONE, 0.25).set_trans(Tween.TRANS_BACK)
+	_flash_t = 1.2
+
+var _flash_t := 0.0
+
+func update_hud(time_left: float, total: float, caught: int, fish: float, combo: int, cool: float, charges := 1, max_charges := 1) -> void:
+	_flash_t -= get_process_delta_time()
 	_time_l.text = str(int(ceil(maxf(time_left, 0.0))))
 	_timer_bar.value = 100.0 * maxf(time_left, 0.0) / total
 	_time_l.add_theme_color_override("font_color", Color(1.0, 0.45, 0.4) if time_left < 5.0 else Color(0.85, 0.9, 1.0))
 	_fish_l.text = BigNum.fmt(fish)
 	_caught_l.text = "%d chuột" % caught
-	_combo_l.text = ("Liên hoàn ×%d" % combo) if combo >= 3 else ""
+	if _flash_t <= 0.0:
+		_combo_l.text = ("Liên hoàn ×%d" % combo) if combo >= 3 else ""
 	_pounce_bar.value = 100.0 * (1.0 - cool)
+	_pounce_l.text = "Vồ  [Space]" + ("   ×%d" % charges if max_charges > 1 else "")
 
 # ------------------------------------------------------------------ summary
 func _build_summary() -> void:
@@ -246,9 +260,9 @@ func _build_shop() -> void:
 	var scroll := ScrollContainer.new(); scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
 	v.add_child(scroll)
-	_shop_grid = GridContainer.new(); _shop_grid.columns = 3
+	_shop_grid = VBoxContainer.new()
 	_shop_grid.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	_shop_grid.add_theme_constant_override("h_separation", 18); _shop_grid.add_theme_constant_override("v_separation", 18)
+	_shop_grid.add_theme_constant_override("separation", 10)
 	scroll.add_child(_shop_grid)
 	var foot := HBoxContainer.new(); foot.alignment = BoxContainer.ALIGNMENT_END; foot.add_theme_constant_override("separation", 16)
 	foot.add_child(_btn("Đêm tiếp theo  ›", func(): night_pressed.emit(), 30))
@@ -258,36 +272,59 @@ func show_shop() -> void:
 	_refresh_shop()
 	_show_only(shop)
 
+func _section(title_: String) -> GridContainer:
+	var h := _lbl(title_, 26, F_BOLD, Color(0.8, 0.88, 1.0))
+	_shop_grid.add_child(h)
+	var g := GridContainer.new(); g.columns = 4
+	g.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	g.add_theme_constant_override("h_separation", 14); g.add_theme_constant_override("v_separation", 14)
+	_shop_grid.add_child(g)
+	return g
+
 func _refresh_shop() -> void:
 	if _shop_grid == null:
 		return
 	_shop_fish.text = "Cá khô  " + BigNum.fmt(Progress.fish)
 	for c in _shop_grid.get_children():
 		c.queue_free()
-	# region unlock card first
+	var top := _section("Bản đồ & đầu thai")
 	if Progress.areas < Upgrades.AREAS.size():
 		var a: Dictionary = Upgrades.AREAS[Progress.areas]
-		_shop_grid.add_child(_card("Mở vùng: " + a.name, "Bản đồ rộng hơn, thêm hang chuột, chuột mới", "Vùng %d/%d" % [Progress.areas, Upgrades.AREAS.size()],
+		top.add_child(_card("Mở vùng: " + a.name, "Bản đồ rộng hơn, thêm hang chuột, mở nâng cấp mới", "Vùng %d/%d" % [Progress.areas, Upgrades.AREAS.size()],
 			Progress.next_area_cost(), Progress.fish >= Progress.next_area_cost(), func():
 				if Progress.buy_area():
 					get_parent().sfx.play("unlock", -4.0); area_bought.emit(), true))
-	for id in Upgrades.DEFS:
-		var d: Dictionary = Upgrades.DEFS[id]
-		if d.unlock >= Progress.areas:
-			continue
-		_shop_grid.add_child(_card(d.name, d.desc, "Cấp %d" % Progress.lv(id), Upgrades.cost(id, Progress.lv(id)), Progress.can_buy(id),
-			func():
-				if Progress.buy(id):
-					get_parent().sfx.play("coin", -2.0)))
 	var souls := Upgrades.souls_for(Progress.lifetime_fish)
-	_shop_grid.add_child(_card("Chín kiếp", "Đầu thai: mất hết nâng cấp, nhận %d Hồn mèo (+%d%% cá vĩnh viễn). Đang có %d hồn." % [souls, souls * 10, Progress.souls],
+	top.add_child(_card("Chín kiếp", "Đầu thai: mất nâng cấp, giữ skin, nhận %d Hồn mèo (+%d%% cá mãi mãi). Đang có %d." % [souls, souls * 10, Progress.souls],
 		"Kiếp %d/9" % (Progress.lives_used + 1), 0.0, souls > 0 and Progress.lives_used < 8, func():
 			if Progress.reincarnate() > 0:
 				get_parent().sfx.play("unlock", -2.0); area_bought.emit(), false, "Đầu thai"))
+	var groups := {}
+	for id in Upgrades.DEFS:
+		var d: Dictionary = Upgrades.DEFS[id]
+		if not groups.has(d.cat):
+			groups[d.cat] = _section(d.cat)
+		var g: GridContainer = groups[d.cat]
+		if d.unlock >= Progress.areas:
+			g.add_child(_card(d.name, d.desc, "Khóa", 0.0, false, func(): pass, false, "Mở vùng %d để mua" % (d.unlock + 1)))
+			continue
+		g.add_child(_card(d.name, d.desc, "Cấp %d" % Progress.lv(id), Upgrades.cost(id, Progress.lv(id)), Progress.can_buy(id),
+			func():
+				if Progress.buy(id):
+					get_parent().sfx.play("coin", -2.0)))
+	var sk := _section("Skin mèo")
+	for id in Upgrades.SKINS:
+		var d: Dictionary = Upgrades.SKINS[id]
+		var owned: bool = id in Progress.skins_owned
+		var label := "Đang dùng" if Progress.skin == id else ("Chọn" if owned else "Mua  ·  %s cá" % BigNum.fmt(d.cost))
+		sk.add_child(_card(d.name, "Skin trang trí, giữ lại khi đầu thai", "Có" if owned else "", d.cost,
+			Progress.skin != id and (owned or Progress.fish >= d.cost), func():
+				if Progress.buy_or_select_skin(id):
+					get_parent().sfx.play("coin", -2.0), false, label))
 
 func _card(name: String, desc: String, tag: String, cost: float, enabled: bool, cb: Callable, special := false, btn_text := "") -> Control:
 	var p := PanelContainer.new()
-	p.custom_minimum_size = Vector2(380, 170)
+	p.custom_minimum_size = Vector2(320, 150)
 	p.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	if special:
 		var sb := (theme_.get_stylebox("panel", "PanelContainer") as StyleBoxFlat).duplicate()

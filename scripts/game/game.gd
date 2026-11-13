@@ -22,6 +22,9 @@ var combo := 0
 var _combo_t := 0.0
 var _spawn_acc := 0.0
 var _shake := 0.0
+var _wave_t := 6.0
+var traps: Array[Node3D] = []
+var owls: Array[Node3D] = []
 var _cam_zoom := 1.0
 const CAM_OFF := Vector3(0, 10.5, 12.5)   # ~40° pitch: shows faces, not just backs
 
@@ -39,6 +42,10 @@ func _ready() -> void:
 	player.global_position = Vector3(0, 0, 3)
 	player.bounds = village.clamp_inside
 	player.pounced.connect(func(): sfx.play("whoosh", -6.0))
+	player.landed.connect(_on_player_landed)
+	player.swarm = swarm
+	player.apply_skin(Progress.skin)
+	Progress.skin_changed.connect(func(): player.apply_skin(Progress.skin))
 	cam = Camera3D.new(); cam.fov = 40.0; cam.far = 300.0
 	add_child(cam); cam.current = true
 	sfx = Sfx.new(); add_child(sfx)
@@ -125,6 +132,7 @@ func _apply_stats() -> void:
 	player.catch_radius = Upgrades.catch_radius(Progress.lv("claw"))
 	player.pounce_dist = Upgrades.pounce_distance(Progress.lv("pounce"))
 	player.pounce_cd = Upgrades.pounce_cooldown(Progress.lv("pounce"))
+	player.max_charges = Upgrades.charges(Progress.lv("charges"))
 	night_len = Upgrades.night_seconds(Progress.lv("time"))
 	swarm.magnet = Upgrades.magnet_radius(Progress.lv("whisker"))
 	village.set_unlocked(Progress.areas)
@@ -150,6 +158,8 @@ func _apply_stats() -> void:
 		k.catch_radius = player.catch_radius
 		k.pounce_dist = player.pounce_dist * 0.8
 		k.pounce_cd = player.pounce_cd * 1.5
+	_sync_traps()
+	_sync_owls()
 	var all: Array[Cat] = [player]
 	all.append_array(kittens)
 	swarm.cats = all
@@ -163,6 +173,9 @@ func start_night() -> void:
 	caught_night = 0
 	fish_night = 0.0
 	combo = 0
+	_wave_t = 4.0
+	for t in traps:
+		t.set_meta("cd", 0.0)
 	phase = Phase.HUNT
 	ui.show_hud()
 	# a few mice already out so the first seconds aren't empty
@@ -182,7 +195,19 @@ func _process(dt: float) -> void:
 		_spawn_acc -= 1.0
 		if swarm.count() < Upgrades.max_mice(Progress.lv("spawn"), Progress.areas):
 			swarm.spawn_at_random_hole(_roll_kind())
-	ui.update_hud(time_left, night_len, caught_night, Progress.fish, combo, player.cooldown_ratio())
+	# đàn chuột: periodic bursts from one hole
+	var ws := Upgrades.wave_size(Progress.lv("wave"))
+	if ws > 0:
+		_wave_t -= dt
+		if _wave_t <= 0.0:
+			_wave_t = 6.0
+			var h: Vector3 = swarm.holes[randi() % swarm.holes.size()] if not swarm.holes.is_empty() else Vector3.ZERO
+			for i in ws:
+				swarm.spawn(_roll_kind(), h + Vector3(randf_range(-0.8, 0.8), 0, randf_range(-0.8, 0.8)))
+			ui.flash("Đàn chuột!")
+	_update_traps(dt)
+	_update_owls(dt)
+	ui.update_hud(time_left, night_len, caught_night, Progress.fish, combo, player.cooldown_ratio(), player.charges_left(), player.max_charges)
 	if time_left <= 0.0:
 		_end_night()
 
@@ -198,17 +223,116 @@ func _roll_kind() -> int:
 func _on_caught(p: Vector3, kind: int, by_player: bool) -> void:
 	caught_night += 1
 	combo += 1
-	_combo_t = 1.6
+	_combo_t = Upgrades.combo_window(Progress.lv("combo"))
+	time_left += Upgrades.time_per_catch(Progress.lv("clock"))
 	var base: float = MiceSwarm.KINDS[kind].fish
-	var mult := Upgrades.bounty_mult(Progress.lv("bounty"), Progress.souls) * (1.0 + 0.1 * mini(combo - 1, 20))
+	var mult := Upgrades.bounty_mult(Progress.lv("bounty"), Progress.souls) * (1.0 + Upgrades.combo_bonus(Progress.lv("combo")) * mini(combo - 1, 30))
+	var triple := randf() < Upgrades.triple_chance(Progress.lv("double"))
+	if triple:
+		mult *= 3.0
 	var gain := base * mult
 	fish_night += gain
 	Progress.add_fish(gain)
-	Juice.popup(self, p + Vector3(0, 0.8, 0), "+" + BigNum.fmt(gain), Color(1.0, 0.85, 0.35) if kind == MiceSwarm.Kind.VANG else Color(0.85, 0.95, 1.0))
+	Juice.popup(self, p + Vector3(0, 0.8, 0), ("+%s ×3" if triple else "+%s") % BigNum.fmt(gain), Color(1.0, 0.85, 0.35) if (triple or kind == MiceSwarm.Kind.VANG) else Color(0.85, 0.95, 1.0))
 	Juice.burst(self, p, MiceSwarm.KINDS[kind].color)
+	Juice.fish(self, p)
 	sfx.play("pop", -4.0, 1.0 + minf(combo, 12) * 0.04)
 	if by_player:
 		_shake = minf(_shake + 0.18, 0.5)
+
+func _on_player_landed(at: Vector3) -> void:
+	Juice.dust(self, at)
+	var r := Upgrades.shock_radius(Progress.lv("shock"))
+	if r > 0.0 and phase == Phase.HUNT:
+		Juice.ring(self, at, r)
+		if swarm.catch_in(at, r, true) > 0:
+			_shake = minf(_shake + 0.25, 0.6)
+
+# ---------------------------------------------------------------- helpers: traps & owls
+func _rand_point() -> Vector3:
+	var rs: Array[Rect2] = []
+	for i in mini(Progress.areas, village.rects.size()):
+		rs.append(village.rects[i])
+	for k in 30:
+		var r: Rect2 = rs[randi() % rs.size()].grow(-2.0)
+		var p := Vector3(randf_range(r.position.x, r.end.x), 0, randf_range(r.position.y, r.end.y))
+		var ok := true
+		for o in village.obstacles:
+			if Vector2(p.x - o[0].x, p.z - o[0].z).length() < o[1] + 0.8:
+				ok = false; break
+		if ok:
+			return p
+	return Vector3.ZERO
+
+func _sync_traps() -> void:
+	var want := Upgrades.traps(Progress.lv("trap"))
+	while traps.size() < want:
+		var t := Node3D.new()
+		# bamboo spring trap: woven base + bent bamboo arm
+		t.add_child(Toon.part(Toon.cyl(0.55, 0.6, 0.12, 12), Color(0.7, 0.6, 0.35), Vector3(0, 0.06, 0), Vector3.ONE, true, {"stripes": 40.0, "stripe_color": Color(0.55, 0.45, 0.25), "stripe_axis": Vector3(1, 0, 1)}))
+		var arm := Node3D.new(); arm.position = Vector3(0, 0.15, 0.45); t.add_child(arm)
+		var bar := Toon.part(Toon.cyl(0.04, 0.04, 0.9, 6), Color(0.55, 0.65, 0.3), Vector3(0, 0.4, 0)); arm.add_child(bar)
+		arm.rotation.x = -1.2
+		t.set_meta("arm", arm); t.set_meta("cd", 0.0)
+		add_child(t)
+		t.global_position = _rand_point()
+		traps.append(t)
+
+func _update_traps(dt: float) -> void:
+	for t in traps:
+		var cd: float = t.get_meta("cd") - dt
+		var arm: Node3D = t.get_meta("arm")
+		arm.rotation.x = lerpf(arm.rotation.x, -1.2 if cd <= 0.0 else 0.0, 1.0 - exp(-12.0 * dt))
+		if cd <= 0.0 and swarm.catch_in(t.global_position, 0.8) > 0:
+			cd = 2.5
+			arm.rotation.x = 0.2
+			sfx.play("click", -2.0, 0.7)
+		t.set_meta("cd", cd)
+
+func _sync_owls() -> void:
+	var want := Upgrades.owls(Progress.lv("owl"))
+	while owls.size() < want:
+		var o := Node3D.new()
+		var body := Toon.part(Toon.sphere(0.45), Color(0.55, 0.45, 0.35), Vector3.ZERO, Vector3(1, 1.15, 0.9)); o.add_child(body)
+		o.add_child(Toon.part(Toon.sphere(0.32), Color(0.85, 0.78, 0.65), Vector3(0, -0.05, -0.25), Vector3(1, 1.1, 0.6), false))
+		for sx in [-1.0, 1.0]:
+			var e := MeshInstance3D.new(); e.mesh = Toon.sphere(0.12); e.material_override = Toon.glow(Color(1.0, 0.75, 0.2), 3.0)
+			e.position = Vector3(0.17 * sx, 0.2, -0.36); o.add_child(e)
+			var wing := Toon.part(Toon.sphere(0.35), Color(0.45, 0.36, 0.28), Vector3(0.45 * sx, 0.0, 0.05), Vector3(0.35, 0.9, 0.8))
+			wing.name = "wing%d" % (0 if sx < 0 else 1)
+			o.add_child(wing)
+			o.add_child(Toon.part(Toon.cone(0.1, 0.25, 4), Color(0.45, 0.36, 0.28), Vector3(0.2 * sx, 0.55, 0)))
+		o.set_meta("a", randf() * TAU); o.set_meta("t", randf() * 2.0); o.set_meta("dive", 0.0)
+		add_child(o)
+		owls.append(o)
+
+func _update_owls(dt: float) -> void:
+	var c := player.global_position
+	for i in owls.size():
+		var o := owls[i]
+		var a: float = o.get_meta("a") + dt * 0.6
+		o.set_meta("a", a)
+		var t: float = o.get_meta("t") - dt
+		var dive: float = o.get_meta("dive")
+		var circle := c + Vector3(cos(a + i) * 9.0, 6.0, sin(a + i) * 9.0)
+		if dive > 0.0:
+			dive -= dt
+			var target: Vector3 = o.get_meta("target")
+			o.global_position = o.global_position.lerp(target + Vector3(0, 0.4, 0), 1.0 - exp(-10.0 * dt))
+			if dive <= 0.0:
+				swarm.catch_in(target, 1.3)
+		else:
+			o.global_position = o.global_position.lerp(circle, 1.0 - exp(-3.0 * dt))
+			if t <= 0.0:
+				t = maxf(1.0, 3.0 - 0.3 * Progress.lv("owl"))
+				var n = swarm.nearest(Vector3(o.global_position.x, 0, o.global_position.z), 14.0)
+				if n != null:
+					o.set_meta("target", n); dive = 0.45
+		o.set_meta("t", t); o.set_meta("dive", dive)
+		o.look_at(o.global_position + Vector3(-sin(a + i), 0, cos(a + i)), Vector3.UP)
+		var flap := sin(Time.get_ticks_msec() * 0.02 + i) * 0.6
+		o.get_node("wing0").rotation.z = flap
+		o.get_node("wing1").rotation.z = -flap
 
 func _end_night() -> void:
 	phase = Phase.SUMMARY

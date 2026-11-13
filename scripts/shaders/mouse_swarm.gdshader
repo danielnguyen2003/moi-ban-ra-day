@@ -16,6 +16,8 @@ void vertex() {
 	VERTEX.y *= sq;
 	VERTEX.z *= 2.0 - sq;
 	VERTEX.y += hop * 0.12 * sp;
+	// startled hops when a cat is close
+	VERTEX.y += INSTANCE_CUSTOM.z * 0.18 * abs(sin(TIME * 13.0 + ph * 2.0));
 	// tail (vertices behind the body) wiggles
 	if (VERTEX.z > 0.32) {
 		VERTEX.x += sin(TIME * 10.0 + ph + VERTEX.z * 6.0) * 0.08 * (VERTEX.z - 0.32) * 4.0;

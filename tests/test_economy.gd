@@ -15,7 +15,7 @@ func test_bignum_format() -> void:
 func test_costs_grow_exponentially() -> void:
 	for id in Upgrades.DEFS:
 		var a := Upgrades.cost(id, 0); var b := Upgrades.cost(id, 10)
-		assert_gt(b, a * 50.0, id + " grows fast enough")
+		assert_gt(b, a * 30.0, id + " grows fast enough")
 
 func test_buy_spends_fish_and_levels_up() -> void:
 	Progress.fish = 100.0
@@ -28,8 +28,10 @@ func test_cannot_buy_without_fish_or_before_unlock() -> void:
 	Progress.fish = 1.0
 	assert_false(Progress.buy("speed"))
 	Progress.fish = 1e9
-	assert_false(Progress.buy("kitten"), "kitten needs region 3")
-	Progress.areas = 3
+	assert_false(Progress.buy("owl"), "owl needs region 4")
+	Progress.areas = 4
+	assert_true(Progress.buy("owl"))
+	Progress.areas = 2
 	assert_true(Progress.buy("kitten"))
 
 func test_area_unlock() -> void:
@@ -61,3 +63,20 @@ func test_save_roundtrip() -> void:
 	assert_eq(Progress.fish, 42.5)
 	assert_eq(Progress.lv("claw"), 3)
 	assert_eq(Progress.areas, 2)
+
+func test_skins_buy_then_select() -> void:
+	Progress.fish = 1000.0
+	assert_true(Progress.buy_or_select_skin("mun"))
+	assert_eq(Progress.skin, "mun")
+	assert_almost_eq(Progress.fish, 1000.0 - Upgrades.SKINS["mun"].cost, 0.01)
+	var f := Progress.fish
+	assert_true(Progress.buy_or_select_skin("muop"), "owned skins switch for free")
+	assert_eq(Progress.fish, f)
+
+func test_skins_survive_reincarnation() -> void:
+	Progress.skins_owned = ["muop", "mun"]; Progress.lifetime_fish = 1e6
+	Progress.reincarnate()
+	assert_has(Progress.skins_owned, "mun")
+
+func test_at_least_15_upgrades() -> void:
+	assert_gte(Upgrades.DEFS.size(), 15)

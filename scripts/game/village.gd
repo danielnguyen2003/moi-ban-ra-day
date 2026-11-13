@@ -15,6 +15,9 @@ const RECTS := [
 	Rect2(-30, 28, 60, 16),    # 5 bãi tha ma
 ]
 
+## Layout is authored at 1x and scaled on the XZ plane so the whole village is ~3x bigger in area.
+const S := 1.8
+var rects: Array[Rect2] = []
 var unlocked := 1
 var holes_by_area: Array = []        ## Array[Array[Vector3]]
 var obstacles: Array = []            ## [center, radius]
@@ -23,12 +26,23 @@ var _labels: Array[Label3D] = []
 var _wisps: Array[Node3D] = []
 var _flames: Array[OmniLight3D] = []
 
+func _s(p: Vector3) -> Vector3:
+	return Vector3(p.x * S, p.y, p.z * S)
+
+func _sr(r: Rect2) -> Rect2:
+	return Rect2(r.position * S, r.size * S)
+
 func build(areas: int) -> void:
+	seed(1604)   # same village every run
+	for r in RECTS:
+		rects.append(_sr(r))
 	for i in RECTS.size():
 		holes_by_area.append([])
 	_area_san(); _area_nha(); _area_vuon(); _area_ao(); _area_dinh(); _area_thama()
 	for i in RECTS.size():
+		_scatter(i)
 		_add_mist(i)
+	randomize()
 	set_unlocked(areas)
 
 func set_unlocked(n: int) -> void:
@@ -45,8 +59,8 @@ func holes() -> Array[Vector3]:
 	return out
 
 func inside(p: Vector3) -> bool:
-	for i in mini(unlocked, RECTS.size()):
-		var r: Rect2 = RECTS[i].grow(-0.4)
+	for i in mini(unlocked, rects.size()):
+		var r: Rect2 = rects[i].grow(-0.4)
 		if r.has_point(Vector2(p.x, p.z)):
 			return true
 	return false
@@ -55,8 +69,8 @@ func clamp_inside(p: Vector3) -> Vector3:
 	if inside(p):
 		return p
 	var best := p; var bd := INF
-	for i in mini(unlocked, RECTS.size()):
-		var r: Rect2 = RECTS[i].grow(-0.5)
+	for i in mini(unlocked, rects.size()):
+		var r: Rect2 = rects[i].grow(-0.5)
 		var q := Vector3(clampf(p.x, r.position.x, r.end.x), p.y, clampf(p.z, r.position.y, r.end.y))
 		var d := q.distance_squared_to(p)
 		if d < bd:
@@ -64,9 +78,9 @@ func clamp_inside(p: Vector3) -> Vector3:
 	return best
 
 func unlocked_bounds() -> Rect2:
-	var r: Rect2 = RECTS[0]
-	for i in mini(unlocked, RECTS.size()):
-		r = r.merge(RECTS[i])
+	var r: Rect2 = rects[0]
+	for i in mini(unlocked, rects.size()):
+		r = r.merge(rects[i])
 	return r
 
 func _process(_dt: float) -> void:
@@ -80,6 +94,7 @@ func _process(_dt: float) -> void:
 
 # ================================================================ helpers
 func _ground(rect: Rect2, mode: int, a: Color, b: Color, line := Color(0.25, 0.16, 0.18), y := 0.0) -> void:
+	rect = _sr(rect)
 	var mi := MeshInstance3D.new()
 	var pm := PlaneMesh.new(); pm.size = rect.size
 	mi.mesh = pm
@@ -90,7 +105,9 @@ func _ground(rect: Rect2, mode: int, a: Color, b: Color, line := Color(0.25, 0.1
 	mi.position = Vector3(rect.get_center().x, y, rect.get_center().y)
 	add_child(mi)
 
-func _put(node: Node3D, pos: Vector3, rot_y := 0.0, solid_r := 0.0) -> Node3D:
+func _put(node: Node3D, pos: Vector3, rot_y := 0.0, solid_r := 0.0, scaled := false) -> Node3D:
+	if not scaled:
+		pos = _s(pos)
 	node.position = pos
 	node.rotation.y = rot_y
 	add_child(node)
@@ -109,7 +126,9 @@ func _group(parts: Array) -> Node3D:
 		n.add_child(p)
 	return n
 
-func _hole(area: int, pos: Vector3) -> void:
+func _hole(area: int, pos: Vector3, scaled := false) -> void:
+	if not scaled:
+		pos = _s(pos)
 	holes_by_area[area].append(pos)
 	var h := Toon.part(Toon.cyl(0.32, 0.32, 0.02, 20), Color(0.05, 0.03, 0.06), pos + Vector3(0, 0.015, 0), Vector3(1, 1, 0.75), false)
 	add_child(h)
@@ -144,8 +163,8 @@ func _wisp(pos: Vector3, color := Color(0.45, 0.95, 1.0)) -> void:
 	hm.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA; hm.albedo_color = Color(color, 0.18)
 	halo.material_override = hm; n.add_child(halo)
 	var l := OmniLight3D.new(); l.light_color = color; l.light_energy = 1.2; l.omni_range = 5.0; n.add_child(l)
-	n.set_meta("base", pos)
 	_put(n, pos)
+	n.set_meta("base", n.position)
 	_wisps.append(n)
 
 func _chum(pos: Vector3, s := 1.0) -> void:
@@ -178,14 +197,15 @@ func _bamboo(pos: Vector3, count := 7) -> void:
 	_put(n, pos, 0.0, 0.9)
 
 func _house_wall(a: Vector3, b: Vector3, h := 1.6, col := Color(0.78, 0.68, 0.52)) -> void:
+	a = _s(a); b = _s(b)
 	var mid := (a + b) / 2.0
 	var len := a.distance_to(b)
 	var w := Toon.part(Toon.box(Vector3(len, h, 0.3)), col, Vector3(0, h / 2, 0))
 	var cap := Toon.part(Toon.box(Vector3(len + 0.2, 0.18, 0.5)), Color(0.45, 0.22, 0.18), Vector3(0, h + 0.09, 0))
-	_put(_group([w, cap]), mid, -atan2(b.z - a.z, b.x - a.x))
+	_put(_group([w, cap]), mid, -atan2(b.z - a.z, b.x - a.x), 0.0, true)
 
 func _label(i: int, text: String) -> void:
-	var r: Rect2 = RECTS[i]
+	var r: Rect2 = rects[i]
 	var l := Label3D.new()
 	l.text = text
 	l.font = FONT
@@ -200,7 +220,7 @@ func _label(i: int, text: String) -> void:
 	_labels.append(l)
 
 func _add_mist(i: int) -> void:
-	var r: Rect2 = RECTS[i]
+	var r: Rect2 = rects[i]
 	var mi := MeshInstance3D.new()
 	var bm := BoxMesh.new(); bm.size = Vector3(r.size.x, 6.0, r.size.y)
 	mi.mesh = bm
@@ -299,14 +319,15 @@ func _area_vuon() -> void:
 func _area_ao() -> void:
 	var r: Rect2 = RECTS[3]
 	_ground(r, 3, Color(0.25, 0.22, 0.2), Color(0.19, 0.17, 0.16))
-	var pond := Rect2(-27, -14, 11, 14)
-	_ground(pond, 4, Color(0.08, 0.12, 0.25), Color(0.12, 0.2, 0.35), Color(), 0.03)
-	obstacles.append([Vector3(pond.get_center().x, 0, pond.get_center().y), 5.6])
+	var pond0 := Rect2(-27, -14, 11, 14)
+	_ground(pond0, 4, Color(0.08, 0.12, 0.25), Color(0.12, 0.2, 0.35), Color(), 0.03)
+	var pond := _sr(pond0)
+	obstacles.append([Vector3(pond.get_center().x, 0, pond.get_center().y), 5.6 * S])
 	var pb := StaticBody3D.new(); pb.collision_layer = 1
 	var pcs := CollisionShape3D.new(); var pbox := BoxShape3D.new(); pbox.size = Vector3(pond.size.x, 2, pond.size.y)
 	pcs.shape = pbox; pb.add_child(pcs); pb.position = Vector3(pond.get_center().x, 1, pond.get_center().y); add_child(pb)
 	for i in 7:   # lily pads
-		add_child(Toon.part(Toon.cyl(0.45, 0.45, 0.03, 14), Color(0.2, 0.45, 0.25), Vector3(randf_range(-26, -17), 0.06, randf_range(-13, -1)), Vector3.ONE, false))
+		add_child(Toon.part(Toon.cyl(0.45, 0.45, 0.03, 14), Color(0.2, 0.45, 0.25), _s(Vector3(randf_range(-26, -17), 0.06, randf_range(-13, -1))), Vector3.ONE, false))
 	# giếng (well)
 	_put(_group([Toon.part(Toon.cyl(0.9, 0.95, 0.9, 18), Color(0.55, 0.52, 0.5), Vector3(0, 0.45, 0)),
 		Toon.part(Toon.cyl(0.7, 0.7, 0.05, 18), Color(0.02, 0.03, 0.06), Vector3(0, 0.91, 0), Vector3.ONE, false)]), Vector3(-14.5, 0, 5), 0.0, 1.0)
@@ -342,7 +363,7 @@ func _area_dinh() -> void:
 			dinh.add_child(Toon.part(Toon.cone(0.25, 0.9, 6), Color(0.5, 0.25, 0.2), Vector3(6.6 * sx, 4.2, 3.4 * sz)))
 	_put(dinh, Vector3(12, 0, 19), 0.0, 0.0)
 	for x in [-5.0, 0.0, 5.0]:
-		obstacles.append([Vector3(12 + x, 0, 19), 0.4])
+		obstacles.append([_s(Vector3(12 + x, 0, 19)), 0.4])
 	_lamp(Vector3(4, 0, 15)); _lamp(Vector3(20, 0, 15)); _lamp(Vector3(-8, 0, 14), Color(1, 0.6, 0.3))
 	for p in [Vector3(-28, 0, 12), Vector3(28, 0, 26), Vector3(0, 0, 26), Vector3(-22, 0, 26)]:
 		_hole(4, p)
@@ -360,3 +381,63 @@ func _area_thama() -> void:
 		_wisp(Vector3(randf_range(-26, 26), 1.5, randf_range(30, 42)), Color(0.5, 1.0, 0.9) if i % 2 == 0 else Color(0.6, 0.75, 1.0))
 	for p in [Vector3(-27, 0, 43), Vector3(27, 0, 30), Vector3(0, 0, 43), Vector3(-10, 0, 31), Vector3(15, 0, 41)]:
 		_hole(5, p)
+
+# ================================================================ filler
+## Scatter small props + extra holes so each region feels lived-in and has more mouse spawns.
+func _scatter(i: int) -> void:
+	var r: Rect2 = rects[i].grow(-1.5)
+	var palettes := [
+		[Color(0.55, 0.38, 0.28), Color(0.6, 0.5, 0.35)],          # sân: pots, straw
+		[Color(0.4, 0.25, 0.18), Color(0.5, 0.42, 0.3)],           # nhà
+		[Color(0.2, 0.42, 0.25), Color(0.3, 0.5, 0.28)],           # vườn
+		[Color(0.25, 0.4, 0.3), Color(0.45, 0.45, 0.42)],          # ao
+		[Color(0.35, 0.3, 0.25), Color(0.45, 0.4, 0.35)],          # đình
+		[Color(0.2, 0.3, 0.27), Color(0.45, 0.47, 0.5)],           # tha ma
+	]
+	var pal: Array = palettes[i]
+	var placed := 0
+	var tries := 0
+	while placed < 10 + int(r.get_area() / 60.0) and tries < 400:
+		tries += 1
+		var p := Vector3(randf_range(r.position.x, r.end.x), 0, randf_range(r.position.y, r.end.y))
+		var ok := true
+		for o in obstacles:
+			if Vector2(p.x - o[0].x, p.z - o[0].z).length() < o[1] + 2.0:
+				ok = false; break
+		if not ok or p.length() < 4.0:
+			continue
+		placed += 1
+		match randi() % 5:
+			0:  # bush / tuft
+				_put(_group([Toon.part(Toon.sphere(0.6), pal[0].lightened(randf() * 0.15), Vector3(0, 0.35, 0), Vector3(1.2, 0.8, 1.0)),
+					Toon.part(Toon.sphere(0.4), pal[0].lightened(0.1), Vector3(0.5, 0.25, 0.2), Vector3(1, 0.8, 1))]), p, randf() * TAU, 0.7, true)
+			1:  # small jar
+				_put(_group([Toon.part(Toon.sphere(0.35), Color(0.42, 0.28, 0.2), Vector3(0, 0.32, 0)),
+					Toon.part(Toon.cyl(0.2, 0.25, 0.15), Color(0.35, 0.24, 0.17), Vector3(0, 0.68, 0))]), p, 0.0, 0.4, true)
+			2:  # stones
+				_put(_group([Toon.part(Toon.sphere(0.35), pal[1], Vector3(0, 0.15, 0), Vector3(1.3, 0.6, 1.0)),
+					Toon.part(Toon.sphere(0.22), pal[1].darkened(0.1), Vector3(0.45, 0.1, 0.25), Vector3(1.2, 0.6, 1.0))]), p, randf() * TAU, 0.5, true)
+			3:  # firewood / straw bundle
+				var g := Node3D.new()
+				for k in 3:
+					var c := Toon.part(Toon.cyl(0.12, 0.12, 1.4, 8), Color(0.5, 0.38, 0.25) if i != 0 else Color(0.85, 0.7, 0.35), Vector3(0, 0.14 + k * 0.2, (k - 1) * 0.22))
+					c.rotation.z = PI / 2; g.add_child(c)
+				_put(g, p, randf() * TAU, 0.7, true)
+			_:  # flower pot / reed
+				_put(_group([Toon.part(Toon.cyl(0.25, 0.18, 0.35, 10), Color(0.6, 0.35, 0.25), Vector3(0, 0.17, 0)),
+					Toon.part(Toon.sphere(0.3), Color(0.25, 0.45, 0.28), Vector3(0, 0.55, 0)),
+					Toon.part(Toon.sphere(0.08), Color(0.95, 0.75, 0.3) if i != 5 else Color(0.7, 0.85, 1.0), Vector3(0.1, 0.8, 0), Vector3.ONE, false)]), p, 0.0, 0.35, true)
+	# extra holes along the region's edges
+	for k in 4:
+		var e := randi() % 4
+		var hp := Vector3.ZERO
+		match e:
+			0: hp = Vector3(randf_range(r.position.x, r.end.x), 0, r.position.y)
+			1: hp = Vector3(randf_range(r.position.x, r.end.x), 0, r.end.y)
+			2: hp = Vector3(r.position.x, 0, randf_range(r.position.y, r.end.y))
+			_: hp = Vector3(r.end.x, 0, randf_range(r.position.y, r.end.y))
+		_hole(i, hp, true)
+	# extra lamps in large regions
+	if i >= 2:
+		for k in 2:
+			_lamp(Vector3(randf_range(r.position.x, r.end.x), 0, randf_range(r.position.y, r.end.y)) / Vector3(S, 1, S))

@@ -59,7 +59,7 @@ func test_night_ends_and_shows_summary() -> void:
 	assert_eq(game.phase, game.Phase.SUMMARY)
 	assert_eq(Progress.nights, 1)
 
-func test_beginner_night_is_stingy_but_not_empty() -> void:
+func test_beginner_night_is_busy() -> void:
 	# The pitch: a fresh cat catches only a handful. Simulate 30 s with the cat chasing the nearest mouse.
 	game.start_night()
 	var t := 0.0
@@ -73,10 +73,41 @@ func test_beginner_night_is_stingy_but_not_empty() -> void:
 		await wait_physics_frames(6)
 		t += 0.1
 	gut.p("beginner caught %d" % game.caught_night)
-	assert_between(game.caught_night, 1, 6, "a perfect-play bot; humans catch fewer")
+	assert_between(game.caught_night, 6, 30, "first night is busy now (feedback: too few mice)")
 
 func test_kittens_spawn_from_upgrade() -> void:
 	Progress.areas = 3; Progress.levels = {"kitten": 2}
 	game._apply_stats()
 	assert_eq(game.kittens.size(), 2)
 	assert_eq(game.swarm.cats.size(), 3)
+
+func test_shockwave_catches_around_landing() -> void:
+	Progress.areas = 2; Progress.levels = {"shock": 3}
+	game.start_night(); game.swarm.clear()
+	var at: Vector3 = game.player.global_position
+	for k in 5:
+		game.swarm.spawn(MiceSwarm.Kind.NHAT, at + Vector3(cos(k) * 2.0, 0, sin(k) * 2.0))
+	for k in game.swarm.count():
+		game.swarm.spawn_in[k] = 0.0
+	game._on_player_landed(at)
+	assert_eq(game.swarm.count(), 0, "all mice within the shock radius are caught")
+
+func test_traps_catch_mice() -> void:
+	Progress.areas = 3; Progress.levels = {"trap": 1}
+	game._apply_stats(); game.start_night(); game.swarm.clear()
+	assert_eq(game.traps.size(), 2)
+	game.swarm.cats = [] as Array[Cat]
+	var tp: Vector3 = game.traps[0].global_position
+	game.swarm.spawn(MiceSwarm.Kind.NHAT, tp); game.swarm.spawn_in[0] = 0.0
+	game._update_traps(0.016)
+	assert_eq(game.swarm.count(), 0)
+	assert_eq(game.caught_night, 1)
+
+func test_pounce_charges() -> void:
+	Progress.areas = 2; Progress.levels = {"charges": 2}
+	game._apply_stats()
+	assert_eq(game.player.max_charges, 3)
+
+func test_more_mice_than_before() -> void:
+	assert_gt(Upgrades.spawn_per_second(0, 1), 0.5)
+	assert_lt(Upgrades.night_seconds(0), 25.0)

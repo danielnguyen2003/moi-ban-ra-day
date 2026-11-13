@@ -15,6 +15,9 @@ var lives_used := 0
 var best_night := 0         ## most mice in one night
 var nights := 0
 var brightness := 1.0
+var skins_owned := ["muop"]
+var skin := "muop"
+signal skin_changed
 
 func _ready() -> void:
 	_bind("move_up", [KEY_W, KEY_UP]); _bind("move_down", [KEY_S, KEY_DOWN])
@@ -48,6 +51,18 @@ func buy(id: String) -> bool:
 	fish -= Upgrades.cost(id, lv(id))
 	levels[id] = lv(id) + 1
 	save_game(); changed.emit()
+	return true
+
+func buy_or_select_skin(id: String) -> bool:
+	if id in skins_owned:
+		skin = id
+	elif fish >= Upgrades.SKINS[id].cost:
+		fish -= Upgrades.SKINS[id].cost
+		skins_owned.append(id)
+		skin = id
+	else:
+		return false
+	save_game(); changed.emit(); skin_changed.emit()
 	return true
 
 func next_area_cost() -> float:
@@ -94,13 +109,15 @@ func set_brightness(v: float) -> void:
 
 func to_dict() -> Dictionary:
 	return {"v": 2, "fish": fish, "lifetime_fish": lifetime_fish, "levels": levels, "areas": areas,
-		"souls": souls, "lives_used": lives_used, "best_night": best_night, "nights": nights, "brightness": brightness}
+		"souls": souls, "lives_used": lives_used, "best_night": best_night, "nights": nights, "brightness": brightness,
+		"skins_owned": skins_owned, "skin": skin}
 
 func from_dict(d: Dictionary) -> void:
 	fish = float(d.get("fish", 0.0)); lifetime_fish = float(d.get("lifetime_fish", 0.0))
 	levels = d.get("levels", {}); areas = int(d.get("areas", 1)); souls = int(d.get("souls", 0))
 	lives_used = int(d.get("lives_used", 0)); best_night = int(d.get("best_night", 0))
 	nights = int(d.get("nights", 0)); brightness = float(d.get("brightness", 1.0))
+	skins_owned = d.get("skins_owned", ["muop"]); skin = d.get("skin", "muop")
 
 func save_game() -> void:
 	if OS.has_feature("editor_hint") or "--no-save" in OS.get_cmdline_user_args():
