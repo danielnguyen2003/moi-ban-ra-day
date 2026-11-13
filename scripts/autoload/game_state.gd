@@ -36,6 +36,7 @@ func _ready() -> void:
 	_bind("interact", [KEY_E])
 	_bind("toggle_fps", [KEY_F3])
 	_bind("ui_cancel_game", [KEY_ESCAPE])
+	_bind("update_game", [KEY_F9])
 	_bind("brightness_down", [KEY_MINUS, KEY_KP_SUBTRACT])
 	_bind("brightness_up", [KEY_EQUAL, KEY_KP_ADD])
 	var cfg := ConfigFile.new()

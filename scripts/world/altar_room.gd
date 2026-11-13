@@ -38,7 +38,7 @@ func _ready() -> void:
 	hud = Hud.new()
 	add_child(hud)
 	GameState.player_caught.connect(_on_caught)
-	GameState.objective_changed.emit("Tìm hộp diêm (trên nóc tủ chè, bên phải gian thờ).")
+	GameState.objective_changed.emit("Tìm hộp diêm — trên nóc tủ chè, sát tường bên phải gian thờ.")
 
 # ---------------------------------------------------------------- environment
 func _environment() -> void:

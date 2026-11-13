@@ -13,6 +13,8 @@ var fading := false
 var prompt: Label
 var controls: Label
 var _controls_t := 25.0
+var version: Label
+var _restart_armed := false
 var _post_mat: ShaderMaterial
 
 func _ready() -> void:
@@ -33,7 +35,7 @@ func _ready() -> void:
 	prompt.add_theme_color_override("font_color", Color(1.0, 0.93, 0.78, 0.95))
 	controls = _label(Vector2(0.03, 0.72), 18, HORIZONTAL_ALIGNMENT_LEFT)
 	controls.add_theme_color_override("font_color", Color(0.85, 0.82, 0.75, 0.85))
-	controls.text = "W A S D — đi      Chuột — nhìn      Shift — chạy (ồn)\nSpace — nhảy      E — ngậm / đặt đồ      − / = — độ sáng\nĐi thẳng vào cột, chân sập, tủ chè, dây thừng để leo\nĐứng yên dưới gầm sập, sau chum, trong ổ rơm để nấp      Esc — thả chuột máy tính"
+	controls.text = "W A S D — đi      Chuột — nhìn      Shift — chạy (ồn)\nSpace — nhảy      E — ngậm / đặt đồ      − / = — độ sáng      F9 — cập nhật\nĐi thẳng vào cột, chân sập, tủ chè, dây thừng để leo\nĐứng yên dưới gầm sập, sau chum, trong ổ rơm để nấp      Esc — thả chuột máy tính"
 	fade = ColorRect.new()
 	fade.color = Color(0, 0, 0, 0)
 	fade.set_anchors_preset(Control.PRESET_FULL_RECT)
@@ -41,6 +43,12 @@ func _ready() -> void:
 	add_child(fade)
 	Director.rhyme_line.connect(func(t): subtitle.text = ("“%s”" % t) if t != "" else "")
 	GameState.objective_changed.connect(func(t): objective.text = t)
+	version = _label(Vector2(0.9, 0.965), 14, HORIZONTAL_ALIGNMENT_LEFT)
+	version.add_theme_color_override("font_color", Color(0.7, 0.68, 0.62, 0.5))
+	version.text = "%s   F9: cập nhật" % Updater.version_label()
+	Updater.status.connect(func(t): _flash(t, 4.0))
+	Updater.update_ready.connect(func(_r): _restart_armed = true)
+	Updater.check_for_updates(true)
 	GameState.brightness_changed.connect(func(v): _flash("Độ sáng: %d%%" % roundi(v * 100)))
 
 func _label(anchor: Vector2, size: int, align: HorizontalAlignment) -> Label:
@@ -58,6 +66,11 @@ func _label(anchor: Vector2, size: int, align: HorizontalAlignment) -> Label:
 	return l
 
 func _process(_dt: float) -> void:
+	if Input.is_action_just_pressed("update_game"):
+		if _restart_armed:
+			Updater.restart()
+		else:
+			Updater.check_for_updates()
 	if Input.is_action_just_pressed("toggle_fps"):
 		fps.visible = not fps.visible
 	if fps.visible:
@@ -91,8 +104,8 @@ func fade_in() -> void:
 func show_ending() -> void:
 	subtitle.text = "Bản thử M1 — hết. (Cảm ơn bạn đã chơi.)"
 
-func _flash(t: String) -> void:
+func _flash(t: String, secs := 1.5) -> void:
 	subtitle.text = t
-	await get_tree().create_timer(1.5).timeout
+	await get_tree().create_timer(secs).timeout
 	if subtitle.text == t:
 		subtitle.text = ""
