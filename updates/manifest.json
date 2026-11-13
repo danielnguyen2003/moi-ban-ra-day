@@ -7,5 +7,13 @@
   },
   "base_pck": "base.pck",
   "base_sha256": "38161a369640779a313d9e96294a0c2d44284140cd230a629a0e3d741a91041f",
-  "patches": []
+  "patches": [
+    {
+      "id": "p1",
+      "file": "patch-0001.pck",
+      "sha256": "31bc21e20a9a85d671a8f7fc86c5771e8ea0032874fc2c66bfd5bb18aec516ad",
+      "size": 23172,
+      "notes": "Âm thanh: mưa đêm, mèo khè khi rượt, cửa kẽo kẹt"
+    }
+  ]
 }
