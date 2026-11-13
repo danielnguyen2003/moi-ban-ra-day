@@ -1,0 +1,38 @@
+; Engine configuration file.
+config_version=5
+
+[application]
+config/name="Mời Bạn Ra Đây"
+config/description="Game 3D kinh dị dân gian Việt Nam — mèo đuổi chuột, đêm rằm tháng Bảy."
+run/main_scene="res://scenes/main.tscn"
+config/features=PackedStringArray("4.7", "Forward Plus")
+
+[autoload]
+GameState="*res://scripts/autoload/game_state.gd"
+NoiseBus="*res://scripts/autoload/noise_bus.gd"
+Director="*res://scripts/autoload/director.gd"
+
+[display]
+window/size/viewport_width=1920
+window/size/viewport_height=1080
+window/stretch/mode="canvas_items"
+
+[layer_names]
+3d_physics/layer_1="world"
+3d_physics/layer_2="cat_blocker"
+3d_physics/layer_3="mouse"
+3d_physics/layer_4="cat"
+3d_physics/layer_5="hide_spot"
+3d_physics/layer_6="climbable"
+3d_physics/layer_7="incense_zone"
+3d_physics/layer_8="acoustics"
+
+[physics]
+3d/physics_engine="Jolt Physics"
+common/physics_ticks_per_second=60
+
+[rendering]
+anti_aliasing/quality/msaa_3d=2
+environment/volumetric_fog/volume_size=96
+environment/volumetric_fog/volume_depth=96
+lights_and_shadows/positional_shadow/atlas_size=8192

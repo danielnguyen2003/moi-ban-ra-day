@@ -9,6 +9,9 @@ frame = int(argv[2]) if len(argv) > 2 else None
 bpy.ops.wm.read_factory_settings(use_empty=True)
 bpy.ops.import_scene.gltf(filepath=src)
 sc = bpy.context.scene
+for o in list(sc.objects):
+    if o.type == "MESH" and o.parent is None and o.name.startswith("Icosphere"):
+        bpy.data.objects.remove(o, do_unlink=True)  # glTF importer's bone display shape
 meshes = [o for o in sc.objects if o.type == "MESH"]
 arms = [o for o in sc.objects if o.type == "ARMATURE"]
 print("STATS meshes=%d tris=%d armatures=%s bones=%s actions=%s" % (

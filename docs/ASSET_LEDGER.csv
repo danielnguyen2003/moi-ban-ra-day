@@ -1,6 +1,5 @@
 name,source,url,author,license,modified,used_in
-polyhaven/street_rat,Poly Haven,https://polyhaven.com/a/street_rat,Sean Buckley,CC0,no,
-sketchfab/cat_bicolor,Sketchfab,https://sketchfab.com/3d-models/bicolor-cat-e623a618ca344a8393d7ba4d63ec23cf,kenchoo,CC-BY-4.0,no,
-sketchfab/cat_black_animated,Sketchfab,https://sketchfab.com/3d-models/an-animated-cat-aec25699660043a29595f9572149d1e8,Evil_Katz,CC-BY-4.0,no,
-sketchfab/cat_tabby_sleeping_scan,Sketchfab,https://sketchfab.com/3d-models/sleeping-cat-on-the-bed-1-3d-scan-ae07a741be6944e8ba5e2657069d3aaf,Alben Tan,CC-BY-4.0,no,
-sketchfab/cat_walk_orange,Sketchfab,https://sketchfab.com/3d-models/cat-walk-fc6e597a81ce4dc291dcca6a9e6888ba,Erina eka syaharani,CC-BY-4.0,no,
+addons/gut,GitHub bitwes/Gut v9.6.1,https://github.com/bitwes/Gut,Butch Wesley and contributors,MIT,no,
+polyhaven/street_rat,Poly Haven,https://polyhaven.com/a/street_rat,Sean Buckley,CC0,no,rat (player)
+sketchfab/cat_tabby_sleeping_scan,Sketchfab,https://sketchfab.com/3d-models/sleeping-cat-on-the-bed-1-3d-scan-ae07a741be6944e8ba5e2657069d3aaf,Alben Tan,CC-BY-4.0,no,ending scene
+sketchfab/cat_walk_orange,Sketchfab,https://sketchfab.com/3d-models/cat-walk-fc6e597a81ce4dc291dcca6a9e6888ba,Erina eka syaharani,CC-BY-4.0,yes: re-tinted to grey-brown tabby (tools/blender/make_cat_muop.py),cat (gameplay)
