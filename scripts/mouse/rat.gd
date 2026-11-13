@@ -165,7 +165,7 @@ func _climb(dt: float, input: Vector2) -> void:
 		_stop_climb()
 		velocity = Vector3.UP * 7.0 - _climb_normal * 4.0
 	else:
-		_climb_normal = _climb_normal.slerp(hit.normal, 0.3).normalized()
+		_climb_normal = _climb_normal.lerp(hit.normal, 0.3).normalized()
 	if is_on_floor() and input.y > 0.3:
 		_stop_climb()
 
@@ -217,13 +217,27 @@ func _on_area_exited(a: Area3D) -> void:
 		hide_spots = maxi(0, hide_spots - 1)
 	_nearby_pickups.erase(a)
 
+## What pressing E would do right now (for the HUD prompt). Empty = nothing.
+func interact_hint() -> String:
+	if carrying == null and not _nearby_pickups.is_empty():
+		return "[E] Ngậm %s" % _nearby_pickups[0].get_meta("label", "đồ vật")
+	if carrying:
+		for d in get_tree().get_nodes_in_group("dropzone"):
+			if d.global_position.distance_to(global_position) < 3.0:
+				return "[E] Đặt %s vào bát hương" % carrying.get_meta("label", "đồ vật")
+		return "[E] Nhả %s" % carrying.get_meta("label", "đồ vật")
+	return ""
+
 func _interact() -> void:
 	if carrying == null and not _nearby_pickups.is_empty():
 		var p := _nearby_pickups[0] as Node3D
 		carrying = p
+		_nearby_pickups.erase(p)
 		p.reparent(self)
 		p.position = Vector3(0, 0.25, -0.75)
+		p.rotation = Vector3.ZERO
 		GameState.collect(p.get_meta("item_id", p.name))
+		GameState.objective_changed.emit("Mang %s tới bát hương trên bàn thờ." % p.get_meta("label", "đồ vật"))
 		NoiseBus.emit_noise(global_position, 3.0, self)
 	elif carrying:
 		for d in get_tree().get_nodes_in_group("dropzone"):

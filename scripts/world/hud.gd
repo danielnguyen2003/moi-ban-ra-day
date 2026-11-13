@@ -10,6 +10,9 @@ var fps: Label
 var fade: ColorRect
 var post: ColorRect
 var fading := false
+var prompt: Label
+var controls: Label
+var _controls_t := 25.0
 var _post_mat: ShaderMaterial
 
 func _ready() -> void:
@@ -26,6 +29,11 @@ func _ready() -> void:
 	objective.add_theme_color_override("font_color", Color(0.75, 0.72, 0.66, 0.7))
 	fps = _label(Vector2(0.92, 0.03), 16, HORIZONTAL_ALIGNMENT_LEFT)
 	fps.visible = false
+	prompt = _label(Vector2(0.5, 0.62), 26, HORIZONTAL_ALIGNMENT_CENTER)
+	prompt.add_theme_color_override("font_color", Color(1.0, 0.93, 0.78, 0.95))
+	controls = _label(Vector2(0.03, 0.72), 18, HORIZONTAL_ALIGNMENT_LEFT)
+	controls.add_theme_color_override("font_color", Color(0.85, 0.82, 0.75, 0.85))
+	controls.text = "W A S D — đi      Chuột — nhìn      Shift — chạy (ồn)\nSpace — nhảy      E — ngậm / đặt đồ      Đi thẳng vào cột, chân sập, tủ chè, dây thừng để leo\nĐứng yên dưới gầm sập, sau chum, trong ổ rơm để nấp      Esc — thả chuột máy tính"
 	fade = ColorRect.new()
 	fade.color = Color(0, 0, 0, 0)
 	fade.set_anchors_preset(Control.PRESET_FULL_RECT)
@@ -57,6 +65,10 @@ func _process(_dt: float) -> void:
 	var fear := Director.menace
 	if rat:
 		fear = maxf(fear, rat.exposure * 0.6)
+		prompt.text = rat.interact_hint()
+	if _controls_t > 0.0:
+		_controls_t -= _dt
+		controls.modulate.a = clampf(_controls_t / 3.0, 0.0, 1.0)
 	_post_mat.set_shader_parameter("fear", fear)
 	_post_mat.set_shader_parameter("time_s", Time.get_ticks_msec() / 1000.0)
 

@@ -38,7 +38,7 @@ func _ready() -> void:
 	hud = Hud.new()
 	add_child(hud)
 	GameState.player_caught.connect(_on_caught)
-	GameState.objective_changed.emit("Tìm hộp diêm.")
+	GameState.objective_changed.emit("Tìm hộp diêm (trên nóc tủ chè, bên phải gian thờ).")
 
 # ---------------------------------------------------------------- environment
 func _environment() -> void:
@@ -250,7 +250,7 @@ func _gameplay() -> void:
 	add_child(incense)
 	# Matchbox on top of the tủ chè.
 	var mb := Pickup.new()
-	mb.setup("matchbox", Vector3(0.55, 0.18, 0.38), Color(0.55, 0.18, 0.12))
+	mb.setup("matchbox", Vector3(0.55, 0.18, 0.38), Color(0.55, 0.18, 0.12), "hộp diêm")
 	mb.position = Vector3(15.0, 10.1, -8.0)
 	add_child(mb)
 	# Drop zone: the incense bowl.
