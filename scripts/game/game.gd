@@ -179,8 +179,8 @@ func start_night() -> void:
 	phase = Phase.HUNT
 	ui.show_hud()
 	# a few mice already out so the first seconds aren't empty
-	for i in mini(1 + Progress.areas, Upgrades.max_mice(Progress.lv("spawn"), Progress.areas)):
-		swarm.spawn_at_random_hole(_roll_kind())
+	for i in mini(6 + 2 * Progress.areas, Upgrades.max_mice(Progress.lv("spawn"), Progress.areas)):
+		_spawn_one(_roll_kind())
 
 func _process(dt: float) -> void:
 	_place_cam(false, dt)
@@ -194,7 +194,7 @@ func _process(dt: float) -> void:
 	while _spawn_acc >= 1.0:
 		_spawn_acc -= 1.0
 		if swarm.count() < Upgrades.max_mice(Progress.lv("spawn"), Progress.areas):
-			swarm.spawn_at_random_hole(_roll_kind())
+			_spawn_one(_roll_kind())
 	# đàn chuột: periodic bursts from one hole
 	var ws := Upgrades.wave_size(Progress.lv("wave"))
 	if ws > 0:
@@ -210,6 +210,18 @@ func _process(dt: float) -> void:
 	ui.update_hud(time_left, night_len, caught_night, Progress.fish, combo, player.cooldown_ratio(), player.charges_left(), player.max_charges)
 	if time_left <= 0.0:
 		_end_night()
+
+## Half the mice pop out of the ground near the cat (so there is always something to chase on the
+## big map); the rest come from the holes at the edges.
+func _spawn_one(k: int) -> void:
+	if randf() < 0.5:
+		for t in 8:
+			var a := randf() * TAU
+			var p := player.global_position + Vector3(cos(a), 0, sin(a)) * randf_range(6.0, 14.0)
+			if village.inside(p):
+				swarm.spawn(k, p)
+				return
+	swarm.spawn_at_random_hole(k)
 
 func _roll_kind() -> int:
 	if randf() < Upgrades.golden_chance(Progress.lv("luck")):
