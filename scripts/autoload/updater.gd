@@ -49,7 +49,9 @@ func check_for_updates(quiet := false) -> void:
 	busy = true
 	if not quiet:
 		status.emit("Đang kiểm tra cập nhật…")
-	var m = await _get_json(manifest_url)
+	# Cache-bust the CDN (raw.githubusercontent.com caches ~5 min). Takes effect from the next full build:
+	# this script itself is loaded before patches are mounted, so it can't be patched.
+	var m = await _get_json(manifest_url + "?t=%d" % Time.get_unix_time_from_system())
 	if m == null:
 		busy = false
 		if not quiet:
