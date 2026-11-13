@@ -16,8 +16,8 @@ const CAT_START := Vector3(-4.0, 0.2, 2.0)
 func _ready() -> void:
 	nav = NavigationRegion3D.new()
 	var nm := NavigationMesh.new()
-	nm.agent_radius = 1.2
-	nm.agent_height = 2.6
+	nm.agent_radius = 1.25
+	nm.agent_height = 2.75
 	nm.agent_max_climb = 0.5
 	nm.cell_size = 0.25
 	nm.cell_height = 0.25
@@ -67,11 +67,11 @@ func _environment() -> void:
 
 # ---------------------------------------------------------------- house shell
 func _architecture() -> void:
-	var brick := b.mat("brick_floor", Color(0.34, 0.17, 0.11), 0.95)
-	var laterite := b.mat("laterite", Color(0.42, 0.25, 0.14), 0.98)
-	var earth_wall := b.mat("earth_wall", Color(0.47, 0.40, 0.31), 0.98)
-	var wood := b.mat("wood_old", Color(0.20, 0.12, 0.07), 0.7)
-	var dark := b.mat("roof_under", Color(0.05, 0.04, 0.035), 1.0)
+	var brick := b.pbr("brick_floor", 1.5, Color(0.8, 0.7, 0.65))
+	var laterite := b.pbr("red_laterite_soil_stones", 1.2, Color(0.75, 0.6, 0.5))
+	var earth_wall := b.pbr("patterned_clay_wall", 1.6, Color(0.8, 0.72, 0.6))
+	var wood := b.pbr("dark_wood", 1.0, Color(0.7, 0.6, 0.55))
+	var dark := b.pbr("bamboo_wall_02", 1.0, Color(0.25, 0.2, 0.17))
 	b.box("Floor", Vector3(40, 1, 56), Vector3(0, -0.5, 0), brick, GameState.L_WORLD, "brick")
 	b.box("Ceiling", Vector3(40, 1, 56), Vector3(0, 42.5, 0), dark)
 	b.box("BackWall", Vector3(40, 42, 1), Vector3(0, 21, -26.5), laterite)
@@ -116,12 +116,12 @@ func _wall_with_holes(name: String, x: float, hole_z: Array, m: Material) -> voi
 
 # ---------------------------------------------------------------- altar
 func _altar() -> void:
-	var lacquer := b.mat("lacquer_red", Color(0.22, 0.05, 0.03), 0.45)
+	var lacquer := b.pbr("lacquered_cherry_wood", 0.8, Color(0.6, 0.25, 0.2))
 	var gilt := b.mat("gilt_dull", Color(0.45, 0.33, 0.12), 0.5, 0.7)
 	var ceramic := b.mat("ceramic_glaze", Color(0.55, 0.52, 0.45), 0.3)
 	var brass := b.mat("brass_tarnish", Color(0.38, 0.28, 0.12), 0.45, 0.85)
 	var photo := b.mat("photo_bw", Color(0.3, 0.3, 0.3), 0.6)
-	var wood := b.mat("wood_old", Color(0.20, 0.12, 0.07))
+	var wood := b.pbr("dark_wood", 1.0, Color(0.7, 0.6, 0.55))
 	# Án thờ: top slab on four legs; legs are climbable.
 	b.box("AltarTop", Vector3(20, 1, 7), Vector3(0, 10.5, -22.5), lacquer, GameState.L_WORLD, "wood")
 	for x in [-9.4, 9.4]:
@@ -145,7 +145,7 @@ func _altar() -> void:
 
 # ---------------------------------------------------------------- furniture
 func _furniture() -> void:
-	var gu := b.mat("go_gu", Color(0.12, 0.07, 0.045), 0.55)
+	var gu := b.pbr("rosewood_veneer1", 0.8, Color(0.55, 0.42, 0.38))
 	var jar := b.mat("sanh_jar", Color(0.24, 0.17, 0.12), 0.6)
 	var straw := b.mat("straw", Color(0.55, 0.45, 0.25), 1.0)
 	var shard := b.mat("shards", Color(0.3, 0.22, 0.17), 0.5)
@@ -179,14 +179,14 @@ func _furniture() -> void:
 
 # ---------------------------------------------------------------- yard
 func _yard() -> void:
-	var earth := b.mat("yard_earth", Color(0.20, 0.17, 0.13), 1.0)
-	var brick := b.mat("brick_floor", Color(0.34, 0.17, 0.11))
-	var table := b.mat("wood_old", Color(0.20, 0.12, 0.07))
+	var earth := b.pbr("dirt_floor", 2.0, Color(0.7, 0.68, 0.65))
+	var brick := b.pbr("brick_floor", 1.5, Color(0.8, 0.7, 0.65))
+	var table := b.pbr("dark_wood", 1.0, Color(0.7, 0.6, 0.55))
 	b.box("YardFloor", Vector3(60, 1, 30), Vector3(0, -0.5, 42), earth, GameState.L_WORLD, "earth")
 	b.box("Porch", Vector3(40, 0.6, 4), Vector3(0, 0.3, 29), brick, GameState.L_WORLD, "brick")
-	b.box("YardWallL", Vector3(1, 12, 30), Vector3(-30, 6, 42), b.mat("laterite", Color()))
-	b.box("YardWallR", Vector3(1, 12, 30), Vector3(30, 6, 42), b.mat("laterite", Color()))
-	b.box("YardWallF", Vector3(60, 12, 1), Vector3(0, 6, 57), b.mat("laterite", Color()))
+	b.box("YardWallL", Vector3(1, 12, 30), Vector3(-30, 6, 42), b.pbr("red_laterite_soil_stones", 1.2, Color(0.75, 0.6, 0.5)))
+	b.box("YardWallR", Vector3(1, 12, 30), Vector3(30, 6, 42), b.pbr("red_laterite_soil_stones", 1.2, Color(0.75, 0.6, 0.5)))
+	b.box("YardWallF", Vector3(60, 12, 1), Vector3(0, 6, 57), b.pbr("red_laterite_soil_stones", 1.2, Color(0.75, 0.6, 0.5)))
 	# Mâm cúng cô hồn: a low tray table outside with bowls of rice porridge, salt and rice.
 	b.box("OfferingTable", Vector3(8, 4, 5), Vector3(-6, 2, 36), table, GameState.L_WORLD, "wood")
 	var bowl := b.mat("ceramic_glaze", Color())

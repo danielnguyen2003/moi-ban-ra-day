@@ -91,3 +91,30 @@ func omni(name: String, pos: Vector3, color: Color, energy: float, rng: float, s
 
 func _world() -> Node:
 	return root.get_parent() if root.get_parent() else root
+
+## World-space triplanar PBR material from a Poly Haven texture set (diff / nor_gl / arm).
+## tile = metres covered by one texture repeat (real-world scale, converted by WORLD_SCALE).
+func pbr(tex_id: String, tile_m: float, tint := Color.WHITE, res := "2k") -> StandardMaterial3D:
+	var key := "pbr_%s_%s_%s" % [tex_id, tile_m, tint.to_html()]
+	if mats.has(key):
+		return mats[key]
+	var base := "res://assets/textures/polyhaven/%s/%s_%%s_%s.jpg" % [tex_id, tex_id, res]
+	var m := StandardMaterial3D.new()
+	m.albedo_color = tint
+	m.albedo_texture = load(base % "diff")
+	m.normal_enabled = true
+	m.normal_texture = load(base % "nor_gl")
+	var arm: Texture2D = load(base % "arm")
+	m.roughness_texture = arm
+	m.roughness_texture_channel = BaseMaterial3D.TEXTURE_CHANNEL_GREEN
+	m.ao_enabled = true
+	m.ao_texture = arm
+	m.ao_texture_channel = BaseMaterial3D.TEXTURE_CHANNEL_RED
+	m.metallic_texture = arm
+	m.metallic_texture_channel = BaseMaterial3D.TEXTURE_CHANNEL_BLUE
+	m.uv1_triplanar = true
+	m.uv1_world_triplanar = true
+	m.uv1_scale = Vector3.ONE / (tile_m * GameState.WORLD_SCALE)
+	m.texture_filter = BaseMaterial3D.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS_ANISOTROPIC
+	mats[key] = m
+	return m

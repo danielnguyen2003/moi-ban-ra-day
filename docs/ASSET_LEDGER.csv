@@ -1,5 +1,17 @@
 name,source,url,author,license,modified,used_in
 addons/gut,GitHub bitwes/Gut v9.6.1,https://github.com/bitwes/Gut,Butch Wesley and contributors,MIT,no,
+polyhaven/bamboo_wall_02,Poly Haven,https://polyhaven.com/a/bamboo_wall_02,Amal Kumar,CC0,no,
+polyhaven/beige_wall_001,Poly Haven,https://polyhaven.com/a/beige_wall_001,"Dimitrios Savva, Rico Cilliers",CC0,no,
+polyhaven/brick_floor,Poly Haven,https://polyhaven.com/a/brick_floor,Rob Tuytel,CC0,no,
+polyhaven/clay_plaster,Poly Haven,https://polyhaven.com/a/clay_plaster,Amal Kumar,CC0,no,
+polyhaven/dark_wood,Poly Haven,https://polyhaven.com/a/dark_wood,"Dario Barresi, Dimitrios Savva, Rico Cilliers",CC0,no,
+polyhaven/dirt_floor,Poly Haven,https://polyhaven.com/a/dirt_floor,eye-candy.xyz,CC0,no,
+polyhaven/lacquered_cherry_wood,Poly Haven,https://polyhaven.com/a/lacquered_cherry_wood,"Jenelle van Heerden, Rico Cilliers",CC0,no,
+polyhaven/patterned_clay_wall,Poly Haven,https://polyhaven.com/a/patterned_clay_wall,"Dario Barresi, Dimitrios Savva, Rico Cilliers",CC0,no,
+polyhaven/red_laterite_soil_stones,Poly Haven,https://polyhaven.com/a/red_laterite_soil_stones,Amal Kumar,CC0,no,
+polyhaven/rosewood_veneer1,Poly Haven,https://polyhaven.com/a/rosewood_veneer1,Jenelle van Heerden,CC0,no,
+polyhaven/rough_wood,Poly Haven,https://polyhaven.com/a/rough_wood,Rob Tuytel,CC0,no,
 polyhaven/street_rat,Poly Haven,https://polyhaven.com/a/street_rat,Sean Buckley,CC0,no,rat (player)
+polyhaven/worn_cracked_plaster,Poly Haven,https://polyhaven.com/a/worn_cracked_plaster,Amal Kumar,CC0,no,
 sketchfab/cat_tabby_sleeping_scan,Sketchfab,https://sketchfab.com/3d-models/sleeping-cat-on-the-bed-1-3d-scan-ae07a741be6944e8ba5e2657069d3aaf,Alben Tan,CC-BY-4.0,no,ending scene
 sketchfab/cat_walk_orange,Sketchfab,https://sketchfab.com/3d-models/cat-walk-fc6e597a81ce4dc291dcca6a9e6888ba,Erina eka syaharani,CC-BY-4.0,yes: re-tinted to grey-brown tabby (tools/blender/make_cat_muop.py),cat (gameplay)

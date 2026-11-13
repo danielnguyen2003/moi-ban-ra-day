@@ -1,0 +1,19 @@
+[remap]
+
+importer="csv_translation"
+type="Translation"
+uid="uid://b4poo4gs4dve2"
+
+[deps]
+
+files=["res://docs/ASSET_LEDGER.source.translation", "res://docs/ASSET_LEDGER.url.translation", "res://docs/ASSET_LEDGER.author.translation", "res://docs/ASSET_LEDGER.license.translation", "res://docs/ASSET_LEDGER.modified.translation", "res://docs/ASSET_LEDGER.used.translation"]
+
+source_file="res://docs/ASSET_LEDGER.csv"
+dest_files=["res://docs/ASSET_LEDGER.source.translation", "res://docs/ASSET_LEDGER.url.translation", "res://docs/ASSET_LEDGER.author.translation", "res://docs/ASSET_LEDGER.license.translation", "res://docs/ASSET_LEDGER.modified.translation", "res://docs/ASSET_LEDGER.used.translation"]
+
+[params]
+
+compress=1
+delimiter=0
+unescape_keys=false
+unescape_translations=true

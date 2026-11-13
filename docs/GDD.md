@@ -122,3 +122,8 @@ Tính cho một người làm toàn thời gian; làm bán thời gian thì nhâ
 - Mèo xuất hiện chủ yếu qua bóng, bàn chân, đôi mắt và tiếng động. Như vậy vừa đáng sợ hơn, vừa ít phải animate toàn thân.
 
 ---
+
+
+## Luật bổ sung (phát sinh khi làm M1)
+- **Con mèo không bước qua ngưỡng cửa.** Sân là vùng an toàn để làm quen điều khiển ở đầu game. Nhưng mâm cúng cô hồn ngoài sân có luật riêng: ăn vụng thì sẽ có tiếng động.
+- **Nhân vật chính là chuột nhà** (model "Street Rat" của Poly Haven, CC0), thay cho chuột nhắt.

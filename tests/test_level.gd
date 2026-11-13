@@ -9,7 +9,7 @@ func before_all() -> void:
 	await wait_physics_frames(5)
 
 func after_all() -> void:
-	level.queue_free()
+	level.free()
 
 func _closest(p: Vector3) -> Vector3:
 	var map := level.get_world_3d().navigation_map
@@ -24,10 +24,26 @@ func test_cat_cannot_path_into_rat_corridor() -> void:
 	var c := _closest(inside)
 	assert_gt(Vector2(c.x, c.z).distance_to(Vector2(inside.x, inside.z)), 1.0, "corridor between walls is not on the cat navmesh")
 
+func _path_end(from: Vector3, to: Vector3) -> Vector3:
+	var map := level.get_world_3d().navigation_map
+	var path := NavigationServer3D.map_get_path(map, from, to, true)
+	return path[path.size() - 1] if path.size() > 0 else from
+
 func test_cat_cannot_path_under_sap() -> void:
 	var under := Vector3(-8.5, 0.3, 2.0)
-	var c := _closest(under)
-	assert_true(c.y > 4.0 or Vector2(c.x, c.z).distance_to(Vector2(under.x, under.z)) > 1.0, "space under the sập is rat-only")
+	var end := _path_end(Vector3(0, 0, 0), under)
+	assert_gt(Vector2(end.x, end.z).distance_to(Vector2(under.x, under.z)), 3.0, "space under the sập is rat-only")
+
+func test_cat_cannot_path_into_corridor_from_room() -> void:
+	var inside := Vector3(-16.8, 0.3, 0.0)
+	var end := _path_end(Vector3(0, 0, 0), inside)
+	assert_gt(Vector2(end.x, end.z).distance_to(Vector2(inside.x, inside.z)), 1.5)
+
+func test_cat_never_crosses_threshold_to_yard() -> void:
+	# Design rule (GDD): the thing in the cat never steps over the door sill; the yard is the tutorial safe zone.
+	var yard := Vector3(10, 0, 40)
+	var end := _path_end(Vector3(0, 0, 0), yard)
+	assert_lt(end.z, 26.0, "cat path stops inside the house")
 
 func test_incense_zone_blocks_only_when_lit() -> void:
 	var z: IncenseZone = level.incense

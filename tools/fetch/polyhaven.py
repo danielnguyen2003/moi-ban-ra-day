@@ -18,7 +18,7 @@ def main(kind, asset_id, res="2k"):
             download(f["url"], os.path.join(out, rel), f.get("md5"))
     else:
         out = os.path.join(ROOT, "assets", "textures", "polyhaven", asset_id)
-        maps = {"Diffuse": "diff", "nor_gl": "nor_gl", "Rough": "rough", "AO": "ao", "Displacement": "disp", "arm": "arm"}
+        maps = {"Diffuse": "diff", "nor_gl": "nor_gl", "arm": "arm"}  # arm = AO, Rough, Metal packed
         for key, short in maps.items():
             if key in files and res in files[key]:
                 fmt = "jpg" if "jpg" in files[key][res] else "png"
