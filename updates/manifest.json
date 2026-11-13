@@ -7,5 +7,13 @@
   },
   "base_pck": "base.pck",
   "base_sha256": "3a77cd3621c86edf3bf70df299e6392f0b94de9800c5856ea358711ed44e7b30",
-  "patches": []
+  "patches": [
+    {
+      "id": "p1",
+      "file": "patch-0001.pck",
+      "sha256": "4c8df5b7f3560bca9053b69994012a2df8dc1296da36e52fe4bcc5f76829f372",
+      "size": 83444,
+      "notes": "v2.1: bản đồ to gấp 3, đêm 20s, chuột nhiều gấp 6-8, 17 nâng cấp, animation mới, skin"
+    }
+  ]
 }
