@@ -1,0 +1,6 @@
+.godot/
+*.import.tmp
+/build/
+/export/
+/refs/_cache/
+__pycache__/
