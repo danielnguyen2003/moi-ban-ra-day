@@ -3,6 +3,7 @@ addons/gut,GitHub bitwes/Gut v9.6.1,https://github.com/bitwes/Gut,Butch Wesley a
 commons/cat_hiss,Wikimedia Commons,https://commons.wikimedia.org/wiki/File:Cat_hissing_-_Zabuhailo.wav,Zabuhailo,CC0,no,
 commons/door_creak,Wikimedia Commons,https://commons.wikimedia.org/wiki/File:Door_handle_creaking.ogg,stephan,Public domain,no,
 commons/night_rain_sea,Wikimedia Commons,https://commons.wikimedia.org/wiki/File:2013-07-24_00-19-04hrs_Chiang_Mai_Chang_Khien_rain_animal_sounds_night_time.ogg,Takeaway,CC BY-SA 3.0,no,
+google/bevietnampro,Google Fonts (github google/fonts),https://github.com/google/fonts/tree/main/ofl/bevietnampro,Be Vietnam Pro Project Authors,OFL-1.1,no,UI font
 polyhaven/bamboo_wall_02,Poly Haven,https://polyhaven.com/a/bamboo_wall_02,Amal Kumar,CC0,no,
 polyhaven/beige_wall_001,Poly Haven,https://polyhaven.com/a/beige_wall_001,"Dimitrios Savva, Rico Cilliers",CC0,no,
 polyhaven/brick_floor,Poly Haven,https://polyhaven.com/a/brick_floor,Rob Tuytel,CC0,no,
@@ -18,3 +19,4 @@ polyhaven/street_rat,Poly Haven,https://polyhaven.com/a/street_rat,Sean Buckley,
 polyhaven/worn_cracked_plaster,Poly Haven,https://polyhaven.com/a/worn_cracked_plaster,Amal Kumar,CC0,no,
 sketchfab/cat_tabby_sleeping_scan,Sketchfab,https://sketchfab.com/3d-models/sleeping-cat-on-the-bed-1-3d-scan-ae07a741be6944e8ba5e2657069d3aaf,Alben Tan,CC-BY-4.0,no,ending scene
 sketchfab/cat_walk_orange,Sketchfab,https://sketchfab.com/3d-models/cat-walk-fc6e597a81ce4dc291dcca6a9e6888ba,Erina eka syaharani,CC-BY-4.0,yes: re-tinted to grey-brown tabby (tools/blender/make_cat_muop.py),cat (gameplay)
+synth/sfx,"Synthesised in-project (tools/make_sfx.sh, sox)",-,this project,CC0,n/a,UI and catch sounds

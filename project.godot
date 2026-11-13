@@ -3,19 +3,17 @@ config_version=5
 
 [application]
 config/name="Mời Bạn Ra Đây"
-config/description="Game 3D kinh dị dân gian Việt Nam — mèo đuổi chuột, đêm rằm tháng Bảy."
-run/main_scene="res://scenes/main.tscn"
+config/description="Mèo săn chuột đêm rằm — game nâng cấp vô hạn, hoạt hình toon, làng quê Việt Nam."
+run/main_scene="res://scenes/game.tscn"
 config/features=PackedStringArray("4.7", "Forward Plus")
 
 [autoload]
 Updater="*res://scripts/autoload/updater.gd"
-GameState="*res://scripts/autoload/game_state.gd"
-NoiseBus="*res://scripts/autoload/noise_bus.gd"
-Director="*res://scripts/autoload/director.gd"
+Progress="*res://scripts/autoload/progress.gd"
 
 [game]
 
-version_base="m1.3"
+version_base="m2.0"
 update_manifest_url="https://raw.githubusercontent.com/danielnguyen2003/moi-ban-ra-day/main/updates/manifest.json"
 
 [display]

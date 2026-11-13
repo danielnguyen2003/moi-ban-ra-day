@@ -3,7 +3,7 @@ import csv, os, sys
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 names = {r["name"] for r in csv.DictReader(open(os.path.join(ROOT, "docs", "ASSET_LEDGER.csv"), encoding="utf-8"))}
 missing = []
-for kind in ("models", "textures", "audio"):
+for kind in ("models", "textures", "audio", "fonts"):
     base = os.path.join(ROOT, "assets", kind)
     if not os.path.isdir(base):
         continue
