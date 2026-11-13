@@ -35,8 +35,8 @@ void fragment() {
 }
 
 void light() {
-	float ndl = clamp(dot(NORMAL, LIGHT), 0.0, 1.0) * ATTENUATION;
+	float ndl = clamp(dot(NORMAL, LIGHT), 0.0, 1.0);
 	float q = floor(ndl * steps + 0.5) / steps;      // banded
 	vec3 lit = mix(shade_color.rgb * 0.6, vec3(1.0), q);
-	DIFFUSE_LIGHT += ALBEDO * lit * LIGHT_COLOR / PI * 1.6;
+	DIFFUSE_LIGHT += ALBEDO * lit * LIGHT_COLOR * ATTENUATION / PI * 1.6;
 }

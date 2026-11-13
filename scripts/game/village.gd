@@ -217,7 +217,7 @@ func _add_mist(i: int) -> void:
 # ================================================================ regions
 func _area_san() -> void:
 	var r: Rect2 = RECTS[0]
-	_ground(r, 0, Color(0.66, 0.34, 0.26), Color(0.56, 0.28, 0.22))
+	_ground(r, 0, Color(0.52, 0.36, 0.31), Color(0.45, 0.31, 0.28), Color(0.2, 0.15, 0.17))
 	# porch (hiên) with columns along the house front
 	_ground(Rect2(-12, -6, 24, 2.2), 1, Color(0.42, 0.28, 0.2), Color(0.36, 0.24, 0.17), Color(0.18, 0.12, 0.1), 0.06)
 	for x in [-10.0, -5.0, 0.0, 5.0, 10.0]:

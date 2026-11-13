@@ -7,10 +7,10 @@ signal caught(pos: Vector3, kind: int, by_player: bool)
 
 enum Kind { NHAT, CONG, VANG, MA }
 const KINDS := {
-	Kind.NHAT: {"color": Color(0.72, 0.68, 0.66), "scale": 1.0,  "flee": 6.0,  "wander": 1.6, "hp": 1, "fish": 1.0},
-	Kind.CONG: {"color": Color(0.45, 0.38, 0.34), "scale": 1.45, "flee": 4.6,  "wander": 1.1, "hp": 2, "fish": 4.0},
-	Kind.VANG: {"color": Color(1.0, 0.8, 0.25),   "scale": 0.95, "flee": 8.5,  "wander": 2.4, "hp": 1, "fish": 25.0},
-	Kind.MA:   {"color": Color(0.55, 0.95, 1.0),  "scale": 1.1,  "flee": 6.5,  "wander": 2.0, "hp": 1, "fish": 60.0},
+	Kind.NHAT: {"color": Color(0.78, 0.74, 0.72), "scale": 1.35,  "flee": 6.0,  "wander": 1.6, "hp": 1, "fish": 1.0},
+	Kind.CONG: {"color": Color(0.5, 0.42, 0.37), "scale": 1.9, "flee": 4.6,  "wander": 1.1, "hp": 2, "fish": 4.0},
+	Kind.VANG: {"color": Color(1.0, 0.8, 0.25),   "scale": 1.3, "flee": 8.5,  "wander": 2.4, "hp": 1, "fish": 25.0},
+	Kind.MA:   {"color": Color(0.55, 0.95, 1.0),  "scale": 1.45,  "flee": 6.5,  "wander": 2.0, "hp": 1, "fish": 60.0},
 }
 const CAP := 1500
 const SHADER := preload("res://scripts/shaders/mouse_swarm.gdshader")

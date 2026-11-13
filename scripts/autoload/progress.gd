@@ -25,6 +25,8 @@ func _ready() -> void:
 	var mb := InputEventMouseButton.new(); mb.button_index = MOUSE_BUTTON_LEFT
 	InputMap.action_add_event("pounce", mb)
 	load_game()
+	if "--capture" in OS.get_cmdline_user_args():
+		add_child.call_deferred(load("res://tools/capture_v2.gd").new())
 
 func _bind(action: String, keys: Array) -> void:
 	if InputMap.has_action(action):

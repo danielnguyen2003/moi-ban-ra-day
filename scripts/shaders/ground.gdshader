@@ -54,7 +54,7 @@ void fragment() {
 }
 
 void light() {
-	float ndl = clamp(dot(NORMAL, LIGHT), 0.0, 1.0) * ATTENUATION;
+	float ndl = clamp(dot(NORMAL, LIGHT), 0.0, 1.0);
 	float q = floor(ndl * 3.0 + 0.5) / 3.0;
-	DIFFUSE_LIGHT += ALBEDO * mix(shade_color.rgb * 0.55, vec3(1.0), q) * LIGHT_COLOR / PI * 1.6;
+	DIFFUSE_LIGHT += ALBEDO * mix(shade_color.rgb * 0.55, vec3(1.0), q) * LIGHT_COLOR * ATTENUATION / PI * 1.6;
 }

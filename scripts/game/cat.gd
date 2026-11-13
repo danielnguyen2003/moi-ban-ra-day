@@ -21,7 +21,7 @@ var bounds: Callable                 ## func(Vector3) -> Vector3 clamp into walk
 var _pounce_t := 0.0                 ## >0 while dashing
 var _cool := 0.0
 var _crouch := 0.0
-var _dir := Vector3.FORWARD
+var _dir := Vector3.BACK          ## start facing the camera
 var _phase := 0.0
 var _squash := 0.0
 var _rig: Node3D

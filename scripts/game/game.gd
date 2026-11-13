@@ -23,6 +23,7 @@ var _combo_t := 0.0
 var _spawn_acc := 0.0
 var _shake := 0.0
 var _cam_zoom := 1.0
+const CAM_OFF := Vector3(0, 10.5, 12.5)   # ~40° pitch: shows faces, not just backs
 
 func _ready() -> void:
 	randomize()
@@ -38,7 +39,7 @@ func _ready() -> void:
 	player.global_position = Vector3(0, 0, 3)
 	player.bounds = village.clamp_inside
 	player.pounced.connect(func(): sfx.play("whoosh", -6.0))
-	cam = Camera3D.new(); cam.fov = 38.0; cam.far = 300.0
+	cam = Camera3D.new(); cam.fov = 40.0; cam.far = 300.0
 	add_child(cam); cam.current = true
 	sfx = Sfx.new(); add_child(sfx)
 	ui = GameUI.new(); add_child(ui)
@@ -63,7 +64,7 @@ func _environment() -> void:
 	env.background_color = Color(0.04, 0.03, 0.09)
 	env.ambient_light_source = Environment.AMBIENT_SOURCE_COLOR
 	env.ambient_light_color = Color(0.32, 0.3, 0.55)
-	env.ambient_light_energy = 0.55
+	env.ambient_light_energy = 0.7
 	env.tonemap_mode = Environment.TONE_MAPPER_FILMIC
 	env.glow_enabled = true
 	env.glow_intensity = 0.9
@@ -73,6 +74,9 @@ func _environment() -> void:
 	env.fog_light_color = Color(0.12, 0.1, 0.25)
 	env.fog_density = 0.012
 	env.fog_sky_affect = 0.0
+	env.ssao_enabled = true
+	env.ssao_radius = 1.2
+	env.ssao_intensity = 2.2
 	env.adjustment_enabled = true
 	env.adjustment_saturation = 1.15
 	env.adjustment_contrast = 1.05
@@ -80,7 +84,7 @@ func _environment() -> void:
 	add_child(we)
 	var moon := DirectionalLight3D.new()
 	moon.light_color = Color(0.62, 0.7, 1.0)
-	moon.light_energy = 0.9
+	moon.light_energy = 1.15
 	moon.rotation_degrees = Vector3(-55, -35, 0)
 	moon.shadow_enabled = true
 	moon.directional_shadow_max_distance = 80.0
@@ -112,7 +116,7 @@ func _environment() -> void:
 	add_child(fx)
 
 func _apply_brightness(v: float) -> void:
-	env.ambient_light_energy = 0.55 * v
+	env.ambient_light_energy = 0.7 * v
 	env.tonemap_exposure = 1.0 * v
 
 # ---------------------------------------------------------------- stats
@@ -229,12 +233,12 @@ func _place_cam(snap: bool, dt := 0.016) -> void:
 	var focus := player.global_position
 	if phase != Phase.HUNT:
 		focus = focus.lerp(Vector3(0, 0, 0), 0.3)
-	var goal := focus + Vector3(0, 17.0, 13.0) * _cam_zoom
+	var goal := focus + Vector3(0, 0, -1.5) + CAM_OFF * _cam_zoom
 	if snap:
 		cam.global_position = goal
 	else:
 		cam.global_position = cam.global_position.lerp(goal, 1.0 - exp(-5.0 * dt))
 	_shake = maxf(0.0, _shake - dt * 1.8)
 	var sh := Vector3(randf_range(-1, 1), randf_range(-1, 1), 0) * _shake * 0.25
-	cam.look_at(cam.global_position - Vector3(0, 17.0, 13.0).normalized() + sh * 0.02, Vector3.UP)
+	cam.look_at(cam.global_position - CAM_OFF.normalized() + sh * 0.02, Vector3.UP)
 	cam.global_position += sh

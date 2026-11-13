@@ -33,12 +33,12 @@ void fragment() {
 	ALBEDO = c;
 	ROUGHNESS = 0.85;
 	float rim = pow(1.0 - clamp(dot(NORMAL, VIEW), 0.0, 1.0), 3.0);
-	EMISSION = (v_mat > 0.75 ? vec3(0.9) * 0.15 : rim_color.rgb * rim * 0.25) + v_col * v_ghost * (0.6 + 0.4 * sin(TIME * 4.0));
+	EMISSION = (v_mat > 0.75 ? vec3(0.9) * 0.15 : rim_color.rgb * rim * 0.6) + v_col * v_ghost * (0.6 + 0.4 * sin(TIME * 4.0));
 
 }
 
 void light() {
-	float ndl = clamp(dot(NORMAL, LIGHT), 0.0, 1.0) * ATTENUATION;
+	float ndl = clamp(dot(NORMAL, LIGHT), 0.0, 1.0);
 	float q = floor(ndl * 3.0 + 0.5) / 3.0;
-	DIFFUSE_LIGHT += ALBEDO * mix(shade_color.rgb * 0.6, vec3(1.0), q) * LIGHT_COLOR / PI * 1.6;
+	DIFFUSE_LIGHT += ALBEDO * mix(shade_color.rgb * 0.6, vec3(1.0), q) * LIGHT_COLOR * ATTENUATION / PI * 1.6;
 }
