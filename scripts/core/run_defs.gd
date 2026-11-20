@@ -14,7 +14,7 @@ const WEAPONS := {
 	"claw":    {"name": "Móng vuốt",   "desc": "Cào hình quạt phía trước mặt",            "evo": "might",   "evo_name": "Vuốt hổ",        "evo_desc": "Cào tròn 360°, sát thương ×2"},
 	"lantern": {"name": "Đèn ông sao", "desc": "Đèn sao xoay quanh mèo, quật chuột",       "evo": "bell",    "evo_name": "Đèn kéo quân",   "evo_desc": "6 đèn xoay vòng rộng, không ngừng"},
 	"cracker": {"name": "Pháo đùng",   "desc": "Ném pháo vào bầy chuột, nổ lan",           "evo": "bowl",    "evo_name": "Pháo hoa",       "evo_desc": "Mỗi quả nổ bung thành chùm pháo hoa"},
-	"yarn":    {"name": "Cuộn len",    "desc": "Cuộn len lăn nảy khắp nơi",                "evo": "speed",   "evo_name": "Len thần",       "evo_desc": "Cuộn len to gấp đôi, tách đôi khi nảy"},
+	"yarn":    {"name": "Cuộn len",    "desc": "Ném vào chuột gần nhất, nảy dây chuyền sang con kế", "evo": "speed",   "evo_name": "Len thần",       "evo_desc": "Cuộn len to, nảy gấp đôi, tách cuộn nhỏ mỗi lần nảy"},
 	"wisp":    {"name": "Ma trơi",     "desc": "Ma trơi tự đuổi theo chuột gần nhất",      "evo": "whisker", "evo_name": "Hồn ma trơi",    "evo_desc": "Ma trơi nảy liên hoàn sang 3 con"},
 	"nia":     {"name": "Nia",         "desc": "Ném nia bay ra rồi quay về, xuyên bầy",    "evo": "fish",    "evo_name": "Nia vàng",       "evo_desc": "Hai nia, bay xa gấp đôi"},
 }
@@ -92,7 +92,7 @@ static func weapon_stats(id: String, lv: int, evolved := false) -> Dictionary:
 		"cracker":
 			return {"dmg": 22.0 + 8.0 * l, "cd": maxf(0.6, 1.7 - 0.1 * l), "radius": 1.9 + 0.16 * l, "count": 1 + int(lv / 3), "cluster": evolved}
 		"yarn":
-			return {"dmg": 11.0 + 4.0 * l, "cd": maxf(1.2, 3.2 - 0.2 * l), "radius": (0.55 + 0.04 * l) * (2.0 if evolved else 1.0), "count": 1 + int(lv / 3), "life": 4.0 + 0.3 * l, "split": evolved}
+			return {"dmg": 17.0 + 5.5 * l, "cd": maxf(0.8, 2.2 - 0.15 * l), "radius": (0.7 + 0.05 * l) * (1.5 if evolved else 1.0), "count": 1 + int(lv / 3), "bounces": (4 + int(lv / 2)) * (2 if evolved else 1), "life": 5.0, "split": evolved}
 		"wisp":
 			return {"dmg": 16.0 + 6.0 * l, "cd": maxf(0.4, 1.25 - 0.08 * l), "count": 1 + int(lv / 3), "chain": 3 if evolved else 0}
 		"nia":

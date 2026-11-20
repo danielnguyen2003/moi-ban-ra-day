@@ -62,9 +62,15 @@ func _fire(id: String, s: Dictionary) -> void:
 			for t in targets:
 				_throw_cracker(at, t, s)
 		"yarn":
+			# aim each ball at one of the nearest mice; a ball with no target rolls ahead
+			var targets: Array = game.swarm.nearest_n(at, 14.0, s.count)
 			for k in s.count:
-				var a := randf() * TAU
-				_spawn_yarn(at, Vector3(cos(a), 0, sin(a)), s)
+				var dir: Vector3 = p._dir
+				if k < targets.size():
+					dir = (targets[k] - at); dir.y = 0
+				else:
+					dir = p._dir.rotated(Vector3.UP, randf_range(-0.8, 0.8))
+				_spawn_yarn(at, dir.normalized(), s)
 		"wisp":
 			var targets: Array = game.swarm.nearest_n(at, 14.0, s.count)
 			for t in targets:
@@ -154,7 +160,7 @@ func _spawn_yarn(at: Vector3, dir: Vector3, s: Dictionary, small := false) -> vo
 	n.global_position = at + Vector3(0, r, 0)
 	var thread := Fx.Trail.new(n, (n.material_override as ShaderMaterial).get_shader_parameter("albedo"), 0.05, 26)
 	game.add_child(thread)
-	_projectiles.append({"node": n, "kind": "yarn", "vel": dir * 9.0, "life": s.life, "tick": 0.0, "s": s, "r": r, "small": small})
+	_projectiles.append({"node": n, "kind": "yarn", "vel": dir * 13.0, "life": s.life * (0.5 if small else 1.0), "tick": 0.0, "s": s, "r": r, "small": small, "bounces": int(s.bounces) / (2 if small else 1)})
 
 func _spawn_wisp(at: Vector3, target: Vector3, s: Dictionary) -> void:
 	var n := Node3D.new()
@@ -208,23 +214,37 @@ func _update_projectiles(dt: float) -> void:
 				p.life -= dt
 				var v: Vector3 = p.vel
 				var np: Vector3 = n.global_position + v * dt
+				np.y = p.r
 				if not game.village.inside(np):
-					# bounce off the map edge; the evolved ball splits in two
 					var c: Vector3 = game.village.clamp_inside(np)
 					var nrm: Vector3 = c - np; nrm.y = 0
 					if nrm.length() > 0.001:
 						v = v.bounce(nrm.normalized())
 					np = n.global_position
-					if p.s.split and not p.small:
-						_spawn_yarn(np, v.rotated(Vector3.UP, 0.7).normalized(), p.s, true)
-				p.vel = v
 				n.global_position = np
 				if v.length() > 0.01:
 					n.rotate(v.cross(Vector3.UP).normalized(), -v.length() * dt / p.r)
 				p.tick -= dt
 				if p.tick <= 0.0:
-					p.tick = 0.25
-					game.hit(np, p.r + 0.25, p.s.dmg * might)
+					var hits: int = game.swarm.damage_in(np, p.r + 0.35, p.s.dmg * might, Vector3.ZERO, TAU, 3.0)
+					var touched = game.swarm.nearest(np, p.r + 0.45)
+					if is_instance_valid(game.boss): game.boss.try_hit(np, p.r + 0.35, p.s.dmg * might)
+					if is_instance_valid(game.wedding): game.wedding.try_hit(np, p.r + 0.35, p.s.dmg * might)
+					if hits > 0 or touched != null:
+						p.tick = 0.12
+						# ricochet to the next mouse that isn't right here
+						var nxt = null
+						for cand in game.swarm.nearest_n(np, 9.0, 6):
+							if cand.distance_to(np) > p.r + 0.6:
+								nxt = cand; break
+						if nxt != null and p.bounces > 0:
+							p.bounces -= 1
+							var d: Vector3 = nxt - np; d.y = 0
+							v = d.normalized() * 14.0
+							Fx.sparks(game, np + Vector3(0, 0.3, 0), (n.material_override as ShaderMaterial).get_shader_parameter("albedo"), 5, 4.0)
+							if p.s.split and not p.small:
+								_spawn_yarn(np, v.rotated(Vector3.UP, 0.8).normalized(), p.s, true)
+				p.vel = v
 				if p.life <= 0.0:
 					alive = false
 			"wisp":

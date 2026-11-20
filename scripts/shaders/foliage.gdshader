@@ -1,22 +1,29 @@
 shader_type spatial;
-// Vertex-coloured toon foliage for MultiMesh (grass, rice, reeds, bamboo, flowers) with wind sway.
+// Vertex-coloured toon foliage for MultiMesh with gentle wind. The bend grows linearly with
+// height above the instance origin and is scaled by `sway` per material, so tall plants lean a
+// little at the top instead of stretching (v4 bug: displacement grew with height²).
 render_mode diffuse_toon, specular_disabled, cull_disabled;
-uniform vec4 shade_color : source_color = vec4(0.28, 0.26, 0.5, 1.0);
-uniform float sway = 0.12;
-uniform float emission_from_alpha = 0.0;   // vertex alpha < 1 marks glowing parts (flower hearts)
+uniform vec4 shade_color : source_color = vec4(0.3, 0.28, 0.48, 1.0);
+uniform float sway = 0.03;            // metres of lean per metre of height at full gust
+uniform float emission_from_alpha = 0.0;
+uniform float translucency = 0.25;    // leaves glow a little when back-lit
 
 void vertex() {
-	vec3 wp = (MODEL_MATRIX * vec4(VERTEX, 1.0)).xyz;
+	vec3 wp = (MODEL_MATRIX * vec4(0.0, 0.0, 0.0, 1.0)).xyz;   // per-plant phase
 	float h = max(VERTEX.y, 0.0);
-	float w = sin(TIME * 1.7 + wp.x * 0.35 + wp.z * 0.21) + 0.5 * sin(TIME * 3.1 + wp.z * 0.7);
-	VERTEX.x += w * sway * h * h;
-	VERTEX.z += w * sway * 0.5 * h * h;
+	float gust = sin(TIME * 1.3 + wp.x * 0.15 + wp.z * 0.11) * 0.7 + sin(TIME * 2.9 + wp.z * 0.4) * 0.3;
+	float flutter = sin(TIME * 7.0 + VERTEX.x * 9.0 + VERTEX.z * 7.0) * 0.15;
+	float lean = sway * h * (gust + flutter);
+	VERTEX.x += lean;
+	VERTEX.z += lean * 0.4;
+	VERTEX.y -= abs(lean) * 0.15;     // keep the length roughly constant
 }
 
 void fragment() {
 	ALBEDO = COLOR.rgb;
-	ROUGHNESS = 0.9;
+	ROUGHNESS = 0.85;
 	EMISSION = COLOR.rgb * (1.0 - COLOR.a) * 2.5 * emission_from_alpha;
+	BACKLIGHT = COLOR.rgb * translucency;
 }
 
 void light() {

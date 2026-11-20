@@ -6,6 +6,7 @@ extends Node3D
 const GROUND := preload("res://scripts/shaders/ground.gdshader")
 const FOLIAGE := preload("res://scripts/shaders/foliage.gdshader")
 const SKY := preload("res://scripts/shaders/sky.gdshader")
+const PATH := preload("res://scripts/shaders/path.gdshader")
 const FONT := preload("res://assets/fonts/google/bevietnampro/BeVietnamPro-ExtraBold.ttf")
 
 const WORLD := Rect2(-120, -120, 240, 260)
@@ -25,6 +26,7 @@ var _flames: Array[OmniLight3D] = []
 var _no_grass: Array = []            ## [center, radius] areas kept clear of foliage
 var _paths: Array = []               ## [a, b, width]
 var _foliage_mat: ShaderMaterial
+var _plants := {}                    ## key -> {meshes: Array, xforms: Array[Array], sway: float}
 
 func build(_areas := 1) -> void:
 	seed(1604)
@@ -40,6 +42,7 @@ func build(_areas := 1) -> void:
 	_graves()
 	_bamboo_wall()
 	_foliage()
+	_flush_plants()
 	for k in 40:
 		_holes.append(Vector3(randf_range(WORLD.position.x + 8, WORLD.end.x - 8), 0, randf_range(WORLD.position.y + 8, WORLD.end.y - 8)))
 	randomize()
@@ -156,6 +159,30 @@ func _label(pos: Vector3, text: String) -> void:
 	l.position = pos + Vector3(0, 9.0, 0)
 	add_child(l)
 
+# ============================================================ plant pools (MultiMesh)
+func _plant(key: String, factory: Callable, variants: int, xf: Transform3D, sway: float) -> void:
+	if not _plants.has(key):
+		var meshes := []
+		var lists := []
+		for v in variants:
+			meshes.append(factory.call(1000 + v * 37))
+			lists.append([])
+		_plants[key] = {"meshes": meshes, "xforms": lists, "sway": sway}
+	var e: Dictionary = _plants[key]
+	e.xforms[randi() % e.meshes.size()].append(xf)
+
+func _flush_plants() -> void:
+	for key in _plants:
+		var e: Dictionary = _plants[key]
+		var mat := ShaderMaterial.new(); mat.shader = FOLIAGE
+		mat.set_shader_parameter("sway", e.sway)
+		mat.set_shader_parameter("emission_from_alpha", 1.0)
+		for v in e.meshes.size():
+			if e.xforms[v].is_empty():
+				continue
+			var tall: bool = key in ["banana", "areca", "bamboo", "canopy", "canopy_dark"]
+			add_child(MeshKit.scatter(e.meshes[v], e.xforms[v], mat, tall))
+
 # ============================================================ sky, ground, roads
 func _sky() -> void:
 	var dome := MeshInstance3D.new()
@@ -201,12 +228,14 @@ func _road(a: Vector3, b: Vector3, width := 4.0, lamps := true) -> void:
 	var mi := MeshInstance3D.new()
 	var pm := PlaneMesh.new(); pm.size = Vector2(width, len + width * 0.6)
 	mi.mesh = pm
-	mi.material_override = _ground_mat(3, Color(0.36, 0.29, 0.24), Color(0.3, 0.24, 0.2))
+	var rm := _ground_mat(3, Color(0.36, 0.29, 0.24), Color(0.3, 0.24, 0.2))
+	rm.shader = PATH
+	mi.material_override = rm
 	mi.position = mid + Vector3(0, 0.03, 0)
 	mi.rotation.y = atan2(b.x - a.x, b.z - a.z)
 	add_child(mi)
 	var cap := MeshInstance3D.new(); cap.mesh = Toon.cyl(width / 2, width / 2, 0.01, 20)
-	cap.material_override = mi.material_override; cap.position = b + Vector3(0, 0.03, 0); add_child(cap)
+	cap.material_override = _ground_mat(3, Color(0.36, 0.29, 0.24), Color(0.3, 0.24, 0.2)); cap.position = b + Vector3(0, 0.028, 0); add_child(cap)
 	if lamps:
 		var dir := (b - a).normalized()
 		var side := dir.cross(Vector3.UP)
@@ -240,6 +269,36 @@ func _clear(p: Vector3, margin := 0.0) -> bool:
 	return not _near_path(p, margin)
 
 # ============================================================ props
+var _tile_mat: ShaderMaterial
+var _tile_meshes := []
+
+## Ngói âm dương: rows of curved clay tiles laid on a roof slab (a box `size` in its local space).
+func _tiles(slab: Node3D, size: Vector3) -> void:
+	if _tile_meshes.is_empty():
+		_tile_mat = ShaderMaterial.new(); _tile_mat.shader = FOLIAGE
+		_tile_mat.set_shader_parameter("sway", 0.0)
+		_tile_mat.set_shader_parameter("translucency", 0.0)
+		var cyl := CylinderMesh.new(); cyl.top_radius = 0.14; cyl.bottom_radius = 0.16; cyl.height = 0.62; cyl.radial_segments = 8; cyl.rings = 1
+		for c in [Color(0.62, 0.24, 0.16), Color(0.5, 0.19, 0.13), Color(0.44, 0.17, 0.12), Color(0.58, 0.3, 0.2)]:
+			_tile_meshes.append(MeshKit.merge([[cyl, MeshKit.xf(Vector3.ZERO, Vector3(1, 1, 0.5), Vector3(PI / 2, 0, 0)), c]]))
+	var cols := int(size.x / 0.3)
+	var rows := int(size.z / 0.5)
+	var lists := [[], [], [], []]
+	for i in cols:
+		var up := i % 2 == 0          # dương (convex, raised) / âm (concave channel, lower)
+		for j in rows:
+			var x := -size.x / 2 + (i + 0.5) * size.x / cols
+			var z := -size.z / 2 + (j + 0.5) * size.z / rows
+			var y := size.y / 2 + (0.07 if up else 0.0)
+			var v := (0 if up else 2) + (1 if randf() < 0.3 else 0)
+			if randf() < 0.04: v = 3     # an odd, sun-bleached tile here and there
+			lists[v].append(Transform3D(Basis().scaled(Vector3(1.0, 1.0 if up else -0.6, 1.0)), Vector3(x, y, z)))
+	for v in 4:
+		if lists[v].is_empty():
+			continue
+		var mm := MeshKit.scatter(_tile_meshes[v], lists[v], _tile_mat, false)
+		slab.add_child(mm)
+
 func _house(pos: Vector3, rot := 0.0, w := 10.0, d := 6.0, wall := Color(0.86, 0.76, 0.56)) -> void:
 	var n := Node3D.new()
 	n.add_child(_part(Toon.box(Vector3(w + 1.0, 0.6, d + 1.0)), Color(0.55, 0.32, 0.26), Vector3(0, 0.3, 0)))   # brick plinth
@@ -250,9 +309,10 @@ func _house(pos: Vector3, rot := 0.0, w := 10.0, d := 6.0, wall := Color(0.86, 0
 	# tiled roof: two slabs with tile stripes, upturned corners, ridge with curled ends
 	var tile := {"stripes": 26.0, "stripe_color": Color(0.32, 0.12, 0.1), "stripe_axis": Vector3(1, 0, 0)}
 	for side in [-1.0, 1.0]:
-		var slab := _part(Toon.box(Vector3(w + 2.4, 0.25, d * 0.72 + 1.4)), Color(0.55, 0.2, 0.15), Vector3(0, 4.05, side * (d * 0.32 + 0.35)), Vector3.ONE, true, tile)
+		var slab := _part(Toon.box(Vector3(w + 2.4, 0.25, d * 0.72 + 1.4)), Color(0.4, 0.15, 0.11), Vector3(0, 4.05, side * (d * 0.32 + 0.35)), Vector3.ONE, true, tile)
 		slab.rotation.x = side * 0.5
 		n.add_child(slab)
+		_tiles(slab, Vector3(w + 2.4, 0.25, d * 0.72 + 1.4))
 	n.add_child(_part(Toon.box(Vector3(w + 2.6, 0.35, 0.45)), Color(0.45, 0.16, 0.12), Vector3(0, 5.15, 0)))
 	for sx in [-1.0, 1.0]:
 		n.add_child(_part(Toon.sphere(0.3), Color(0.45, 0.16, 0.12), Vector3(sx * (w / 2 + 1.3), 5.35, 0), Vector3(1.2, 1.4, 0.8)))
@@ -293,29 +353,13 @@ func _chum(pos: Vector3, s := 1.0) -> void:
 		_part(Toon.cyl(0.38, 0.45, 0.25), c.darkened(0.15), Vector3(0, 1.15, 0) * s, Vector3.ONE * s),
 		_part(Toon.cyl(0.44, 0.44, 0.08), Color(0.6, 0.5, 0.3), Vector3(0, 1.3, 0) * s, Vector3.ONE * s)]), pos, randf() * TAU, 0.62 * s)
 
-func _areca(pos: Vector3) -> void:   # cây cau: slim trunk with a frond crown
-	var n := Node3D.new()
-	var h := randf_range(7.0, 9.5)
-	n.add_child(_part(Toon.cyl(0.14, 0.2, h, 8), Color(0.55, 0.5, 0.42), Vector3(0, h / 2, 0), Vector3.ONE, true, {"stripes": 30.0, "stripe_color": Color(0.42, 0.38, 0.32), "stripe_axis": Vector3(0, 1, 0)}))
-	for k in 7:
-		var piv := Node3D.new(); piv.position = Vector3(0, h, 0); piv.rotation = Vector3(0, k * TAU / 7.0, 0)
-		var leaf := _part(Toon.sphere(0.5), Color(0.13, 0.27, 0.18), Vector3(0, -0.25, -0.9), Vector3(0.16, 0.04, 1.25), false)
-		leaf.rotation.x = 0.55
-		piv.add_child(leaf); n.add_child(piv)
-	_put(n, pos, 0.0, 0.3)
+func _areca(pos: Vector3) -> void:   # cây cau
+	_plant("areca", PlantKit.areca, 3, MeshKit.xf(pos, Vector3.ONE * randf_range(0.9, 1.1), Vector3(0, randf() * TAU, 0)), 0.012)
+	_solid(pos, 0.3)
 
 func _banana(pos: Vector3) -> void:
-	var n := Node3D.new()
-	n.add_child(_part(Toon.cyl(0.2, 0.3, 3.2, 10), Color(0.45, 0.55, 0.3), Vector3(0, 1.6, 0)))
-	for i in 7:
-		var leaf := _part(Toon.sphere(0.5), Color(0.24, 0.55, 0.3).lightened(randf() * 0.1), Vector3.ZERO, Vector3(0.38, 0.06, 1.7))
-		var piv := Node3D.new(); piv.position = Vector3(0, 3.2, 0); piv.rotation = Vector3(0.0, i * TAU / 7.0 + randf() * 0.4, 0)
-		leaf.position = Vector3(0, -0.15, -1.0); leaf.rotation.x = 0.45
-		piv.add_child(leaf); n.add_child(piv)
-	if randf() < 0.5:   # hanging bunch with a purple blossom
-		n.add_child(_part(Toon.sphere(0.25), Color(0.6, 0.65, 0.3), Vector3(0.3, 2.5, 0), Vector3(1, 1.4, 1)))
-		n.add_child(_part(Toon.cone(0.16, 0.4, 8), Color(0.55, 0.2, 0.35), Vector3(0.3, 2.0, 0)))
-	_put(n, pos, randf() * TAU, 0.35)
+	_plant("banana", PlantKit.banana, 4, MeshKit.xf(pos, Vector3.ONE * randf_range(0.85, 1.15), Vector3(0, randf() * TAU, 0)), 0.03)
+	_solid(pos, 0.35)
 
 func _scarecrow(pos: Vector3) -> void:   # bù nhìn đội nón lá
 	var n := Node3D.new()
@@ -347,12 +391,21 @@ func _banyan(pos: Vector3, s := 1.0) -> void:   # cây đa cổ thụ
 	for i in 14:
 		var a := i * TAU / 14.0
 		n.add_child(_part(Toon.cyl(0.07, 0.12, 6.0, 5), Color(0.3, 0.24, 0.2), Vector3(cos(a) * randf_range(2.5, 4.5), 3.0, sin(a) * randf_range(2.5, 4.5))))
-	for i in 9:
-		var a := i * TAU / 9.0
-		n.add_child(_part(Toon.sphere(3.0), Color(0.12, 0.27, 0.2).lightened(randf() * 0.08), Vector3(cos(a) * 3.0, 8.0 + randf() * 1.5, sin(a) * 3.0), Vector3(1.25, 0.8, 1.25)))
-	n.add_child(_part(Toon.sphere(3.4), Color(0.14, 0.3, 0.22), Vector3(0, 10.0, 0), Vector3(1.2, 0.8, 1.2)))
+	for i in 6:   # main limbs
+		var a := i * TAU / 6.0
+		var limb := _part(Toon.cyl(0.25, 0.5, 5.0, 8), Color(0.33, 0.26, 0.22), Vector3.ZERO)
+		var piv := Node3D.new(); piv.position = Vector3(0, 6.0, 0); piv.rotation = Vector3(0.95, a, 0)
+		limb.position.y = 2.4; piv.add_child(limb); n.add_child(piv)
 	n.scale = Vector3.ONE * s
 	_put(n, pos, randf() * TAU, 2.4 * s)
+	# canopy: hundreds of leaf clusters on a domed shell (dark inside, lighter on top)
+	for k in 140:
+		var d := Vector3(randf_range(-1, 1), randf_range(-0.35, 1.0), randf_range(-1, 1)).normalized()
+		var shell := randf_range(0.75, 1.0)
+		var cp := pos + Vector3(d.x * 7.0, 9.0 + d.y * 3.2, d.z * 7.0) * shell * s
+		var key := "canopy" if d.y > 0.1 else "canopy_dark"
+		var fac := (func(sd): return PlantKit.leaf_cluster(sd, Color(0.1, 0.24, 0.15), Color(0.28, 0.45, 0.24))) if key == "canopy" else (func(sd): return PlantKit.leaf_cluster(sd, Color(0.06, 0.15, 0.11), Color(0.15, 0.28, 0.17)))
+		_plant(key, fac, 3, MeshKit.xf(cp, Vector3.ONE * randf_range(1.6, 2.3) * s, Vector3(randf() * 0.5, randf() * TAU, randf() * 0.5)), 0.01)
 
 func _gao_tree(pos: Vector3) -> void:   # cây gạo: bare branches with red blossoms (graveyard landmark)
 	var n := Node3D.new()
@@ -380,8 +433,9 @@ func _gate(pos: Vector3, rot := 0.0) -> void:   # cổng làng
 		n.add_child(_part(Toon.box(Vector3(1.4, 5.0, 1.4)), Color(0.75, 0.7, 0.62), Vector3(sx, 2.5, 0)))
 		n.add_child(_part(Toon.cone(0.9, 1.0, 4), Color(0.5, 0.2, 0.15), Vector3(sx, 5.5, 0)))
 	n.add_child(_part(Toon.box(Vector3(8.2, 1.2, 1.6)), Color(0.75, 0.7, 0.62), Vector3(0, 4.6, 0)))
-	var roof := _part(Toon.box(Vector3(9.4, 0.3, 2.6)), Color(0.55, 0.2, 0.15), Vector3(0, 5.45, 0), Vector3.ONE, true, {"stripes": 26.0, "stripe_color": Color(0.32, 0.12, 0.1), "stripe_axis": Vector3(1, 0, 0)})
+	var roof := _part(Toon.box(Vector3(9.4, 0.3, 2.6)), Color(0.4, 0.15, 0.11), Vector3(0, 5.45, 0), Vector3.ONE, true, {"stripes": 26.0, "stripe_color": Color(0.32, 0.12, 0.1), "stripe_axis": Vector3(1, 0, 0)})
 	n.add_child(roof)
+	_tiles(roof, Vector3(9.4, 0.3, 2.6))
 	for sx in [-1.0, 1.0]:
 		var c := _part(Toon.cone(0.2, 0.9, 6), Color(0.55, 0.2, 0.15), Vector3(sx * 4.8, 5.8, 0)); c.rotation.z = -sx * 0.7; n.add_child(c)
 	n.add_child(_part(Toon.box(Vector3(3.0, 0.8, 0.1)), Color(0.3, 0.12, 0.1), Vector3(0, 4.6, 0.82)))
@@ -398,8 +452,9 @@ func _dinh_hall(pos: Vector3) -> void:   # đình làng: long low hall with a bi
 			n.add_child(_part(Toon.cyl(0.32, 0.36, 4.2, 10), Color(0.45, 0.13, 0.1), Vector3(x * 2.2, 2.9, z)))
 	var tile := {"stripes": 30.0, "stripe_color": Color(0.28, 0.1, 0.08), "stripe_axis": Vector3(1, 0, 0)}
 	for side in [-1.0, 1.0]:
-		var slab := _part(Toon.box(Vector3(23, 0.35, 7.6)), Color(0.5, 0.18, 0.13), Vector3(0, 6.2, side * 3.0), Vector3.ONE, true, tile)
+		var slab := _part(Toon.box(Vector3(23, 0.35, 7.6)), Color(0.38, 0.14, 0.1), Vector3(0, 6.2, side * 3.0), Vector3.ONE, true, tile)
 		slab.rotation.x = side * 0.42; n.add_child(slab)
+		_tiles(slab, Vector3(23, 0.35, 7.6))
 	n.add_child(_part(Toon.box(Vector3(23.5, 0.6, 0.7)), Color(0.42, 0.14, 0.1), Vector3(0, 7.9, 0)))
 	for sx in [-1.0, 1.0]:
 		n.add_child(_part(Toon.sphere(0.6), Color(0.42, 0.14, 0.1), Vector3(sx * 12.0, 8.3, 0), Vector3(1.0, 1.6, 0.7)))   # đầu đao
@@ -532,16 +587,6 @@ func _graves() -> void:
 	_label(GRAVES + Vector3(0, 0, -6), "Bãi tha ma")
 
 # ============================================================ instanced vegetation
-func _bamboo_clump_mesh() -> ArrayMesh:
-	var parts := []
-	for k in 7:
-		var h := randf_range(6.0, 10.0)
-		var p := Vector3(randf_range(-0.9, 0.9), h / 2, randf_range(-0.9, 0.9))
-		parts.append([Toon.cyl(0.08, 0.11, h, 6), MeshKit.xf(p, Vector3.ONE, Vector3(randf_range(-0.1, 0.1), 0, randf_range(-0.1, 0.1))), Color(0.32, 0.42, 0.24)])
-		parts.append([Toon.sphere(0.6, 6, 8), MeshKit.xf(Vector3(p.x, h, p.z), Vector3(1.0, 0.5, 1.0)), Color(0.1, 0.22, 0.15)])
-		parts.append([Toon.sphere(0.45, 6, 8), MeshKit.xf(Vector3(p.x + 0.4, h - 1.6, p.z), Vector3(1.0, 0.45, 1.0)), Color(0.12, 0.25, 0.16)])
-	return MeshKit.merge(parts)
-
 func _bamboo_wall() -> void:
 	var xforms := []
 	var r := WORLD.grow(1.5)
@@ -571,16 +616,11 @@ func _bamboo_wall() -> void:
 			continue   # sparse, decorative only: a walled courtyard turned the first stage into a cage
 		xforms.append(MeshKit.xf(p, Vector3.ONE * randf_range(0.55, 0.75), Vector3(0, randf() * TAU, 0)))
 		_no_grass.append([p, 1.0])
-	var mm := MeshKit.scatter(_bamboo_clump_mesh(), xforms, _foliage_mat, true)
-	add_child(mm)
+	for x in xforms:
+		_plant("bamboo", PlantKit.bamboo_clump, 3, x, 0.015)
 
 func _foliage() -> void:
 	# grass tufts
-	var tuft := MeshKit.merge([
-		[Toon.cone(0.12, 0.7, 4), MeshKit.xf(Vector3(0, 0.35, 0), Vector3.ONE, Vector3(0.2, 0, 0.1)), Color(0.15, 0.26, 0.17)],
-		[Toon.cone(0.1, 0.55, 4), MeshKit.xf(Vector3(0.12, 0.27, 0.05), Vector3.ONE, Vector3(-0.3, 0, 0.3)), Color(0.18, 0.3, 0.19)],
-		[Toon.cone(0.1, 0.6, 4), MeshKit.xf(Vector3(-0.1, 0.3, -0.06), Vector3.ONE, Vector3(0.1, 0, -0.35)), Color(0.13, 0.23, 0.16)],
-	])
 	var flower := MeshKit.merge([
 		[Toon.cyl(0.02, 0.02, 0.45, 4), MeshKit.xf(Vector3(0, 0.22, 0)), Color(0.25, 0.42, 0.25)],
 		[Toon.sphere(0.11, 4, 6), MeshKit.xf(Vector3(0, 0.48, 0), Vector3(1, 0.6, 1)), Color(1.0, 0.85, 0.45, 0.4)],
@@ -590,18 +630,9 @@ func _foliage() -> void:
 		[Toon.sphere(0.1, 4, 6), MeshKit.xf(Vector3(0, 0.42, 0), Vector3(1, 0.6, 1)), Color(0.75, 0.6, 1.0, 0.4)],
 	])
 	var stone := MeshKit.merge([[Toon.sphere(0.3, 5, 6), MeshKit.xf(Vector3(0, 0.1, 0), Vector3(1.3, 0.6, 1.0)), Color(0.42, 0.4, 0.45)]])
-	var rice := MeshKit.merge([
-		[Toon.cone(0.06, 0.9, 3), MeshKit.xf(Vector3(0, 0.45, 0), Vector3.ONE, Vector3(0.15, 0, 0)), Color(0.42, 0.58, 0.28)],
-		[Toon.cone(0.06, 0.85, 3), MeshKit.xf(Vector3(0.06, 0.42, 0), Vector3.ONE, Vector3(-0.2, 0, 0.2)), Color(0.5, 0.62, 0.3)],
-		[Toon.cone(0.06, 0.8, 3), MeshKit.xf(Vector3(-0.05, 0.4, 0.04), Vector3.ONE, Vector3(0.05, 0, -0.25)), Color(0.62, 0.62, 0.32)],
-	])
-	var reed := MeshKit.merge([
-		[Toon.cyl(0.03, 0.04, 1.8, 4), MeshKit.xf(Vector3(0, 0.9, 0)), Color(0.38, 0.45, 0.28)],
-		[Toon.capsule(0.07, 0.4), MeshKit.xf(Vector3(0, 1.8, 0)), Color(0.45, 0.32, 0.22)],
-	])
 	var g := []; var fl := []; var fl2 := []; var st := []
 	var area := WORLD.grow(-2.0)
-	for k in 9000:
+	for k in 7000:
 		var p := Vector3(randf_range(area.position.x, area.end.x), 0, randf_range(area.position.y, area.end.y))
 		if not _clear(p):
 			continue
@@ -611,7 +642,8 @@ func _foliage() -> void:
 		elif r < 0.93: fl.append(x)
 		elif r < 0.97: fl2.append(x)
 		else: st.append(x)
-	add_child(MeshKit.scatter(tuft, g, _foliage_mat))
+	for x in g:
+		_plant("grass", PlantKit.grass_clump, 4, x, 0.07)
 	add_child(MeshKit.scatter(flower, fl, _foliage_mat))
 	add_child(MeshKit.scatter(flower2, fl2, _foliage_mat))
 	add_child(MeshKit.scatter(stone, st, _foliage_mat))
@@ -627,11 +659,13 @@ func _foliage() -> void:
 				for b in 6:
 					var p := c + Vector3(-3.4 + a * 1.36 + randf() * 0.2, 0, -3.4 + b * 1.36 + randf() * 0.2)
 					rx.append(MeshKit.xf(p, Vector3.ONE * randf_range(0.8, 1.1), Vector3(0, randf() * TAU, 0)))
-	add_child(MeshKit.scatter(rice, rx, _foliage_mat))
+	for x in rx:
+		_plant("rice", PlantKit.rice_clump, 3, x, 0.05)
 	# reeds along the pond bank
 	var rd := []
 	for k in 260:
 		var a := randf() * TAU
 		var s := randf_range(1.0, 1.12)
 		rd.append(MeshKit.xf(POND + Vector3(cos(a) * POND_R.x * s, 0, sin(a) * POND_R.y * s), Vector3.ONE * randf_range(0.7, 1.2), Vector3(0, randf() * TAU, 0)))
-	add_child(MeshKit.scatter(reed, rd, _foliage_mat))
+	for x in rd:
+		_plant("reeds", PlantKit.reed_clump, 3, x, 0.04)

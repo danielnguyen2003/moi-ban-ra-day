@@ -8,6 +8,8 @@ const SHOTS := [
 	["m4_pond", Vector3(-55, 22, 35), Vector3(-78, 0, 5)],
 	["m5_dinh", Vector3(10, 22, 52), Vector3(0, 2, 84)],
 	["m6_graves", Vector3(0, 20, -60), Vector3(0, 0, -95)],
+	["m7_banana_bamboo", Vector3(98, 5, 2), Vector3(114, 2.5, -16)],
+	["m8_home_close", Vector3(8, 7, 10), Vector3(0, 2.5, -14)],
 ]
 
 func _ready() -> void:

@@ -37,9 +37,12 @@ void fragment() {
 		c = mix(base_a.rgb, base_b.rgb, hash(vec2(row, floor((p.x + row * 1.7) / 3.0))));
 		c *= 0.88 + 0.12 * sin(p.x * 6.0 + noise(p * 2.0) * 4.0);
 		c = mix(line_c.rgb, c, smoothstep(0.02, 0.08, min(plank, 1.0 - plank)));
-	} else if (mode == 2) {    // cỏ
+	} else if (mode == 2) {    // cỏ: big soft patches, fine speckle, the odd bare earth spot
+		float big = noise(p * 0.06);
 		float n = noise(p * 0.7) * 0.6 + noise(p * 3.0) * 0.4;
 		c = mix(base_a.rgb, base_b.rgb, n);
+		c = mix(c, c * vec3(1.18, 1.22, 1.05), smoothstep(0.55, 0.8, big));
+		c = mix(c, vec3(0.2, 0.17, 0.15), smoothstep(0.78, 0.86, noise(p * 0.21 + 7.0)) * 0.6);
 	} else if (mode == 3) {    // đất
 		float n = noise(p * 0.9) * 0.5 + noise(p * 4.0) * 0.5;
 		c = mix(base_a.rgb, base_b.rgb, n);
