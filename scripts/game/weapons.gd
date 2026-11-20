@@ -113,6 +113,7 @@ func _slash_fx(at: Vector3, dir: Vector3, r: float, arc: float, evo: bool) -> vo
 func _make_star(color: Color) -> Node3D:
 	# đèn ông sao: five-pointed star from 5 cones + glowing core and a short bamboo stick
 	var n := Node3D.new()
+	n.scale = Vector3.ONE * 1.6
 	for k in 5:
 		var c := MeshInstance3D.new(); c.mesh = Toon.cone(0.12, 0.36, 4)
 		c.material_override = Toon.glow(color, 2.5)
