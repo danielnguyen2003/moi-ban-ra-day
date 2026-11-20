@@ -139,3 +139,18 @@ func test_bot_plays_a_full_night() -> void:
 	gut.p("bot: t=%.0fs kills=%d level=%d lives=%d won=%s weapons=%s" % [game.t, game.kills, game.level, game.lives, game.won, game.weapons.levels])
 	assert_gt(game.kills, 60, "a night has plenty to hunt")
 	assert_gt(game.level, 5, "levels come at a healthy pace")
+
+func test_yarn_actually_hits() -> void:
+	# feedback: "quăng cuộn len nhưng không trúng gì hết"
+	game.weapons.levels = {"yarn": 1}
+	game._apply_stats()
+	game.swarm.clear()
+	var c: Vector3 = game.player.global_position
+	for k in 12:
+		var a := k * TAU / 12.0
+		game.swarm.spawn(MiceSwarm.Kind.NHAT, c + Vector3(cos(a), 0, sin(a)) * randf_range(4.0, 8.0))
+	for k in game.swarm.count(): game.swarm.spawn_in[k] = 0.0
+	game.swarm.frozen = true          # stationary targets: measure aim, not chase
+	await wait_seconds(4.0)
+	gut.p("yarn kills in 4 s: %d" % game.kills)
+	assert_gte(game.kills, 6, "aimed, ricocheting yarn clears a ring of mice")
