@@ -9,11 +9,11 @@ signal bite(dmg: int)
 enum Kind { NHAT, CONG, VANG, MA, CHU }
 const KIND_IDS := {"nhat": Kind.NHAT, "cong": Kind.CONG, "vang": Kind.VANG, "ma": Kind.MA, "chu": Kind.CHU}
 const KINDS := {
-	Kind.NHAT: {"color": Color(0.78, 0.74, 0.72), "scale": 1.35, "hp": 10.0, "speed": 5.6, "mode": "flee",  "xp": 1.0, "fish": 1.0},
-	Kind.CONG: {"color": Color(0.5, 0.42, 0.37),  "scale": 1.9,  "hp": 32.0, "speed": 4.2, "mode": "chase", "xp": 2.0, "fish": 2.0, "bite": 1},
-	Kind.VANG: {"color": Color(1.0, 0.8, 0.25),   "scale": 1.3,  "hp": 18.0, "speed": 8.0, "mode": "flee",  "xp": 8.0, "fish": 15.0},
-	Kind.MA:   {"color": Color(0.55, 0.95, 1.0),  "scale": 1.45, "hp": 26.0, "speed": 5.0, "mode": "chase", "xp": 3.0, "fish": 4.0, "bite": 1, "ghost": true},
-	Kind.CHU:  {"color": Color(0.55, 0.45, 0.6),  "scale": 1.6,  "hp": 45.0, "speed": 3.2, "mode": "chase", "xp": 3.0, "fish": 3.0, "bite": 1},
+	Kind.NHAT: {"color": Color(0.78, 0.74, 0.72), "scale": 1.35, "hp": 10.0, "speed": 5.6, "mode": "flee",  "xp": 2.0, "fish": 1.0},
+	Kind.CONG: {"color": Color(0.5, 0.42, 0.37),  "scale": 1.9,  "hp": 32.0, "speed": 4.2, "mode": "chase", "xp": 4.0, "fish": 2.0, "bite": 1},
+	Kind.VANG: {"color": Color(1.0, 0.8, 0.25),   "scale": 1.3,  "hp": 18.0, "speed": 8.0, "mode": "flee",  "xp": 15.0, "fish": 15.0},
+	Kind.MA:   {"color": Color(0.55, 0.95, 1.0),  "scale": 1.45, "hp": 26.0, "speed": 5.0, "mode": "chase", "xp": 5.0, "fish": 4.0, "bite": 1, "ghost": true},
+	Kind.CHU:  {"color": Color(0.55, 0.45, 0.6),  "scale": 1.6,  "hp": 45.0, "speed": 3.2, "mode": "chase", "xp": 5.0, "fish": 3.0, "bite": 1},
 }
 const CAP := 1500
 const SHADER := preload("res://scripts/shaders/mouse_swarm.gdshader")

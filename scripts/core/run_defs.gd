@@ -69,7 +69,7 @@ static func meta_cost(id: String, lv: int) -> float:
 # ---------------------------------------------------------------- formulas
 static func xp_to_next(level: int) -> float:
 	## level 1 -> 2 needs 5 rice; grows ~ like Vampire Survivors' early curve.
-	return 5.0 + 6.0 * (level - 1) + 0.6 * pow(level - 1, 2.0)
+	return 5.0 + 5.0 * (level - 1) + 0.5 * pow(level - 1, 2.0)
 
 ## Mouse kinds by id (index into MiceSwarm.Kind).
 static func spawn_rate(minute: float, stage: int) -> float:
@@ -79,14 +79,14 @@ static func max_alive(minute: float) -> int:
 	return int(40 + 45 * minute)
 
 static func mouse_hp(base: float, minute: float, stage: int) -> float:
-	return base * (1.0 + 0.35 * minute) * float(STAGES[stage].hp)
+	return base * (1.0 + 0.22 * minute + 0.03 * minute * minute) * float(STAGES[stage].hp)
 
 ## Weapon stats at level (1..8), evolved flag. Returns {dmg, cd, radius, count, ...}.
 static func weapon_stats(id: String, lv: int, evolved := false) -> Dictionary:
 	var l := float(lv - 1)
 	match id:
 		"claw":
-			return {"dmg": (14.0 + 5.0 * l) * (2.0 if evolved else 1.0), "cd": maxf(0.35, 0.95 - 0.06 * l), "radius": 2.4 + 0.18 * l, "arc": TAU if evolved else 2.1}
+			return {"dmg": (18.0 + 6.0 * l) * (2.0 if evolved else 1.0), "cd": maxf(0.3, 0.8 - 0.05 * l), "radius": 3.2 + 0.2 * l, "arc": TAU if evolved else 2.1}
 		"lantern":
 			return {"dmg": 9.0 + 3.5 * l, "cd": 0.3, "radius": 2.6 + 0.12 * l + (1.2 if evolved else 0.0), "count": 6 if evolved else 1 + int(lv / 2), "speed": 2.6 + 0.15 * l}
 		"cracker":

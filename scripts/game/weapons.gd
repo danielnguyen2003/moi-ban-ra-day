@@ -48,7 +48,11 @@ func _fire(id: String, s: Dictionary) -> void:
 	var at := p.global_position
 	match id:
 		"claw":
+			# auto-aim at the nearest mouse (players kite away from the horde), else face forward
 			var dir: Vector3 = p._dir
+			var n = game.swarm.nearest(at, s.radius + 2.5)
+			if n != null and (n - at).length() > 0.1:
+				dir = (n - at).normalized(); dir.y = 0
 			game.hit(at, s.radius, s.dmg * might, dir, s.arc)
 			_slash_fx(at, dir, s.radius, s.arc, evolved.get(id, false))
 		"cracker":

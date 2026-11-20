@@ -19,6 +19,7 @@ var _body: MeshInstance3D
 var _warn: MeshInstance3D
 var _legs: Array[Node3D] = []
 var _phase := 0.0
+var dead := false
 
 func setup(g, hp_: float) -> void:
 	game = g
@@ -69,19 +70,22 @@ func _build() -> void:
 	add_child(_warn)
 
 func try_hit(center: Vector3, r: float, dmg: float) -> bool:
+	if dead:
+		return false
 	var d := Vector2(center.x - global_position.x, center.z - global_position.z).length()
 	if d < r + 1.6:
 		hp -= dmg
 		_flash = 1.0
 		hp_changed.emit(hp / max_hp)
 		if hp <= 0.0:
+			dead = true
 			died.emit(global_position)
 			queue_free()
 		return true
 	return false
 
 func _physics_process(dt: float) -> void:
-	if game == null or game.player == null or get_tree().paused:
+	if dead or game == null or game.player == null or get_tree().paused:
 		return
 	var c: Vector3 = game.player.global_position
 	var to := c - global_position; to.y = 0

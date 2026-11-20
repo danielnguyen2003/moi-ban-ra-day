@@ -34,6 +34,7 @@ var boss_spawned := false
 var wedding_done := false
 var won := false
 var offers: Array = []
+var pause_on_levelup := true     ## tests turn this off (a paused tree also stops the test runner)
 var _invuln := 0.0
 var _spawn_acc := 0.0
 var _shake := 0.0
@@ -218,7 +219,7 @@ func _process(dt: float) -> void:
 		_start_wedding()
 	if not boss_spawned and t >= RunDefs.NIGHT_SECONDS:
 		_spawn_boss()
-	if pending_levels > 0 and phase == Phase.RUN:
+	if pending_levels > 0 and phase == Phase.RUN and not won:
 		_open_levelup()
 	ui.update_hud({"t": t, "total": RunDefs.NIGHT_SECONDS, "lives": lives, "max_lives": max_lives, "level": level,
 		"xp": xp / xp_next, "kills": kills, "fish": fish_run, "cool": player.cooldown_ratio(),
@@ -247,7 +248,7 @@ func _roll_kind() -> int:
 		return MiceSwarm.Kind.MA
 	if "chu" in allowed and minute >= 1.5 and r < 0.25:
 		return MiceSwarm.Kind.CHU
-	if minute >= 0.75 and r < clampf(0.25 + 0.1 * minute, 0.0, 0.6):
+	if minute >= 1.0 and r < clampf(0.08 + 0.09 * minute, 0.0, 0.5):
 		return MiceSwarm.Kind.CONG
 	return MiceSwarm.Kind.NHAT
 
@@ -327,7 +328,7 @@ func _open_levelup() -> void:
 	pending_levels -= 1
 	offers = build_offers()
 	phase = Phase.LEVELUP
-	get_tree().paused = true
+	get_tree().paused = pause_on_levelup
 	sfx.play("chime", -8.0, 1.2)
 	ui.show_levelup(offers, rerolls, level)
 
@@ -437,14 +438,15 @@ func _spawn_boss() -> void:
 
 func _on_boss_died(at: Vector3) -> void:
 	won = true
+	boss = null
 	Juice.ring(self, at, 8.0)
 	hit(at, 30.0, 99999.0)
 	fish_run += 300.0 * fish_mult()
 	rice.pull_all()
 	shake(0.7)
 	ui.banner("Hạ Chuột Chúa!")
-	await get_tree().create_timer(2.0).timeout
-	if phase == Phase.RUN:
+	await get_tree().create_timer(2.0, true).timeout
+	if phase != Phase.RESULT:
 		_end_run(true)
 
 func _end_run(victory: bool) -> void:

@@ -58,7 +58,7 @@ func test_winning_unlocks_next_stage_then_endless() -> void:
 
 func test_save_roundtrip() -> void:
 	Progress.fish = 42.5; Progress.meta = {"m_life": 2}; Progress.chars_owned = ["muop", "mun"]; Progress.stages_open = 3
-	var d := JSON.parse_string(JSON.stringify(Progress.to_dict()))
+	var d: Dictionary = JSON.parse_string(JSON.stringify(Progress.to_dict()))
 	Progress.from_dict({}); Progress.from_dict(d)
 	assert_eq(Progress.fish, 42.5)
 	assert_eq(Progress.mlv("m_life"), 2)

@@ -7,12 +7,22 @@ func before_each() -> void:
 	Progress.from_dict({})
 	Engine.time_scale = 1.0
 	game = load("res://scenes/game.tscn").instantiate()
+	game.pause_on_levelup = false
 	add_child(game)
 	await wait_physics_frames(3)
 	game.start_run()
 	await wait_physics_frames(2)
 
+func _steer(dir: Vector3) -> void:
+	for a in ["move_left", "move_right", "move_up", "move_down"]:
+		Input.action_release(a)
+	if dir.x < -0.2: Input.action_press("move_left", -dir.x)
+	if dir.x > 0.2: Input.action_press("move_right", dir.x)
+	if dir.z < -0.2: Input.action_press("move_up", -dir.z)
+	if dir.z > 0.2: Input.action_press("move_down", dir.z)
+
 func after_each() -> void:
+	_steer(Vector3.ZERO)
 	get_tree().paused = false
 	Engine.time_scale = 1.0
 	game.free()
@@ -36,13 +46,18 @@ func test_weapon_kill_drops_rice_and_rice_levels_up() -> void:
 
 func test_levelup_pauses_and_card_applies() -> void:
 	game.pending_levels = 1
-	await wait_frames(3)
+	await wait_physics_frames(3)
 	assert_eq(game.phase, game.Phase.LEVELUP)
-	assert_true(get_tree().paused)
 	assert_eq(game.offers.size(), 3)
 	game.pick_card(0)
-	assert_false(get_tree().paused)
 	assert_eq(game.phase, game.Phase.RUN)
+
+func test_levelup_really_pauses_in_game() -> void:
+	game.pause_on_levelup = true
+	game._open_levelup()
+	assert_true(get_tree().paused, "the world freezes while choosing a card")
+	game.pick_card(1)
+	assert_false(get_tree().paused)
 
 func test_offers_respect_slots_and_offer_evolution() -> void:
 	game.weapons.levels = {"claw": 8, "lantern": 3, "yarn": 2, "nia": 1}
@@ -77,16 +92,16 @@ func test_revive() -> void:
 
 func test_wedding_chest() -> void:
 	game.t = RunDefs.WEDDING_AT
-	await wait_frames(2)
+	await wait_physics_frames(2)
 	assert_not_null(game.wedding)
 	var wp: Vector3 = game.wedding.global_position
 	game.hit(wp, 2.0, 1e9)
-	await wait_frames(4)
+	await wait_physics_frames(4)
 	assert_eq(game.phase, game.Phase.LEVELUP, "chest grants level-up picks")
 
 func test_boss_spawns_at_5_minutes_and_win_unlocks_stage() -> void:
 	game.t = RunDefs.NIGHT_SECONDS
-	await wait_frames(2)
+	await wait_physics_frames(2)
 	assert_true(game.boss_spawned)
 	assert_not_null(game.boss)
 	game.hit(game.boss.global_position, 3.0, 1e9)
@@ -96,7 +111,7 @@ func test_boss_spawns_at_5_minutes_and_win_unlocks_stage() -> void:
 
 func test_bot_plays_a_full_night() -> void:
 	# A simple bot: kite away from the nearest hostile, walk to rice, always take the first card.
-	Engine.time_scale = 6.0
+	Engine.time_scale = 8.0
 	var steps := 0
 	while game.phase != game.Phase.RESULT and steps < 4000:
 		steps += 1
@@ -109,7 +124,7 @@ func test_bot_plays_a_full_night() -> void:
 			dir = (p - threat).normalized()
 		elif game.rice.pos.size() > 0:
 			dir = (game.rice.pos[0] - p).normalized()
-		game.player.velocity = Vector3(dir.x, 0, dir.z) * game.player.speed
+		_steer(dir)
 		if randf() < 0.05: game.player.try_pounce()
 		await wait_physics_frames(1)
 	gut.p("bot: t=%.0fs kills=%d level=%d lives=%d won=%s weapons=%s" % [game.t, game.kills, game.level, game.lives, game.won, game.weapons.levels])

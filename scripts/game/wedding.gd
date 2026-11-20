@@ -16,6 +16,7 @@ var _escorts: Array[Node3D] = []
 var _t := 0.0
 var _flash := 0.0
 var _label: Label3D
+var dead := false
 
 func setup(g, from: Vector3, to: Vector3, hp_: float) -> void:
 	game = g
@@ -67,11 +68,14 @@ func _build() -> void:
 	add_child(_label)
 
 func try_hit(center: Vector3, r: float, dmg: float) -> bool:
+	if dead:
+		return false
 	if Vector2(center.x - global_position.x, center.z - global_position.z).length() < r + 1.2:
 		hp -= dmg
 		_flash = 1.0
 		_label.text = "Đám cưới chuột  %d%%" % int(100.0 * maxf(hp, 0.0) / max_hp)
 		if hp <= 0.0:
+			dead = true
 			opened.emit(global_position)
 			for e in _escorts:
 				game.swarm.spawn(MiceSwarm.Kind.VANG, e.global_position)   # escorts scatter as golden mice
