@@ -13,7 +13,7 @@ Progress="*res://scripts/autoload/progress.gd"
 
 [game]
 
-version_base="m3.0"
+version_base="m4.0"
 update_manifest_url="https://raw.githubusercontent.com/danielnguyen2003/moi-ban-ra-day/main/updates/manifest.json"
 
 [debug]
