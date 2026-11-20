@@ -4,6 +4,7 @@ render_mode diffuse_toon, specular_disabled;
 uniform vec4 shade_color : source_color = vec4(0.3, 0.28, 0.5, 1.0);
 uniform vec4 rim_color : source_color = vec4(0.6, 0.8, 1.0, 1.0);
 varying float v_ghost;
+varying float v_angry;
 varying vec3 v_col;
 varying float v_mat;
 
@@ -24,18 +25,19 @@ void vertex() {
 	}
 	// scared shiver
 	VERTEX.x += sin(TIME * 70.0 + ph) * 0.015 * INSTANCE_CUSTOM.z;
-	v_ghost = INSTANCE_CUSTOM.w;
+	v_angry = step(1.5, INSTANCE_CUSTOM.w);
+	v_ghost = INSTANCE_CUSTOM.w - 2.0 * v_angry;
 	v_col = COLOR.rgb;
 	v_mat = UV.x;
 }
 
 void fragment() {
 	vec3 c = v_col;
-	if (v_mat > 0.75) { c = vec3(0.02); } else if (v_mat > 0.25) { c = vec3(0.95, 0.55, 0.62); }
+	if (v_mat > 0.75) { c = mix(vec3(0.02), vec3(1.0, 0.15, 0.1), v_angry); } else if (v_mat > 0.25) { c = vec3(0.95, 0.55, 0.62); }
 	ALBEDO = c;
 	ROUGHNESS = 0.85;
 	float rim = pow(1.0 - clamp(dot(NORMAL, VIEW), 0.0, 1.0), 3.0);
-	EMISSION = (v_mat > 0.75 ? vec3(0.9) * 0.15 : rim_color.rgb * rim * 0.6) + v_col * v_ghost * (0.6 + 0.4 * sin(TIME * 4.0));
+	EMISSION = (v_mat > 0.75 ? mix(vec3(0.9) * 0.15, vec3(3.0, 0.3, 0.2), v_angry) : rim_color.rgb * rim * 0.6) + v_col * v_ghost * (0.6 + 0.4 * sin(TIME * 4.0));
 
 }
 

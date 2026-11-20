@@ -1,0 +1,117 @@
+extends GutTest
+## Simulated nights on the real scene.
+
+var game: Node3D
+
+func before_each() -> void:
+	Progress.from_dict({})
+	Engine.time_scale = 1.0
+	game = load("res://scenes/game.tscn").instantiate()
+	add_child(game)
+	await wait_physics_frames(3)
+	game.start_run()
+	await wait_physics_frames(2)
+
+func after_each() -> void:
+	get_tree().paused = false
+	Engine.time_scale = 1.0
+	game.free()
+
+func test_run_starts_with_character_weapon_and_9_lives() -> void:
+	assert_eq(game.phase, game.Phase.RUN)
+	assert_true(game.weapons.levels.has("claw"))
+	assert_eq(game.lives, 9)
+	assert_gt(game.swarm.count(), 0, "a few mice near the cat at the start")
+
+func test_weapon_kill_drops_rice_and_rice_levels_up() -> void:
+	game.swarm.clear()
+	var at: Vector3 = game.player.global_position + Vector3(2, 0, 0)
+	game.swarm.spawn(MiceSwarm.Kind.NHAT, at); game.swarm.spawn_in[0] = 0.0
+	assert_eq(game.hit(at, 1.0, 999.0), 1)
+	assert_eq(game.kills, 1)
+	assert_eq(game.rice.pos.size(), 1)
+	for k in 10: game.rice.drop(game.player.global_position, 1.0)
+	await wait_physics_frames(5)
+	assert_gt(game.level, 1, "picking up rice levels the cat up")
+
+func test_levelup_pauses_and_card_applies() -> void:
+	game.pending_levels = 1
+	await wait_frames(3)
+	assert_eq(game.phase, game.Phase.LEVELUP)
+	assert_true(get_tree().paused)
+	assert_eq(game.offers.size(), 3)
+	game.pick_card(0)
+	assert_false(get_tree().paused)
+	assert_eq(game.phase, game.Phase.RUN)
+
+func test_offers_respect_slots_and_offer_evolution() -> void:
+	game.weapons.levels = {"claw": 8, "lantern": 3, "yarn": 2, "nia": 1}
+	game.passives = {"might": 1}
+	var seen_new_weapon := false
+	var seen_evo := false
+	for k in 30:
+		for o in game.build_offers():
+			if o.type == "weapon" and not game.weapons.levels.has(o.id): seen_new_weapon = true
+			if o.type == "evo": seen_evo = true
+	assert_false(seen_new_weapon, "4 weapon slots full: no new weapons offered")
+	assert_true(seen_evo, "claw lv8 + Móng sắc offers Vuốt hổ")
+
+func test_bite_costs_a_life_with_invulnerability() -> void:
+	game.on_bite(1)
+	game.on_bite(1)
+	assert_eq(game.lives, 8, "second bite inside i-frames is ignored")
+
+func test_death_ends_run_and_banks_fish() -> void:
+	game.fish_run = 50.0
+	game.lives = 1
+	game.on_bite(1)
+	assert_eq(game.phase, game.Phase.RESULT)
+	assert_eq(Progress.fish, 50.0)
+
+func test_revive() -> void:
+	game.revives = 1
+	game.lives = 1
+	game.on_bite(1)
+	assert_eq(game.phase, game.Phase.RUN)
+	assert_gt(game.lives, 1)
+
+func test_wedding_chest() -> void:
+	game.t = RunDefs.WEDDING_AT
+	await wait_frames(2)
+	assert_not_null(game.wedding)
+	var wp: Vector3 = game.wedding.global_position
+	game.hit(wp, 2.0, 1e9)
+	await wait_frames(4)
+	assert_eq(game.phase, game.Phase.LEVELUP, "chest grants level-up picks")
+
+func test_boss_spawns_at_5_minutes_and_win_unlocks_stage() -> void:
+	game.t = RunDefs.NIGHT_SECONDS
+	await wait_frames(2)
+	assert_true(game.boss_spawned)
+	assert_not_null(game.boss)
+	game.hit(game.boss.global_position, 3.0, 1e9)
+	await wait_seconds(2.3)
+	assert_eq(game.phase, game.Phase.RESULT)
+	assert_eq(Progress.stages_open, 2)
+
+func test_bot_plays_a_full_night() -> void:
+	# A simple bot: kite away from the nearest hostile, walk to rice, always take the first card.
+	Engine.time_scale = 6.0
+	var steps := 0
+	while game.phase != game.Phase.RESULT and steps < 4000:
+		steps += 1
+		if game.phase == game.Phase.LEVELUP:
+			game.pick_card(0)
+		var p: Vector3 = game.player.global_position
+		var threat = game.swarm.nearest(p, 3.5)
+		var dir := Vector3.ZERO
+		if threat != null:
+			dir = (p - threat).normalized()
+		elif game.rice.pos.size() > 0:
+			dir = (game.rice.pos[0] - p).normalized()
+		game.player.velocity = Vector3(dir.x, 0, dir.z) * game.player.speed
+		if randf() < 0.05: game.player.try_pounce()
+		await wait_physics_frames(1)
+	gut.p("bot: t=%.0fs kills=%d level=%d lives=%d won=%s weapons=%s" % [game.t, game.kills, game.level, game.lives, game.won, game.weapons.levels])
+	assert_gt(game.kills, 60, "a night has plenty to hunt")
+	assert_gt(game.level, 5, "levels come at a healthy pace")

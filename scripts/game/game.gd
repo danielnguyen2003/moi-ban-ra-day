@@ -1,67 +1,97 @@
 extends Node3D
-## Main flow: HUNT (one night) -> SUMMARY -> SHOP -> HUNT … Builds world, camera, lighting.
+## Mèo Survivors: one night = one run. TITLE -> SELECT -> RUN (<-> LEVELUP) -> RESULT -> SHOP/SELECT.
 
-const FONT_B := preload("res://assets/fonts/google/bevietnampro/BeVietnamPro-ExtraBold.ttf")
-enum Phase { TITLE, HUNT, SUMMARY, SHOP }
+enum Phase { TITLE, SELECT, RUN, LEVELUP, PAUSED, RESULT, SHOP }
+const CAM_OFF := Vector3(0, 13.5, 15.0)
 
 var phase := Phase.TITLE
 var village: Village
 var swarm: MiceSwarm
+var rice: RiceField
+var weapons: Weapons
 var player: Cat
-var kittens: Array[Cat] = []
+var boss: RatKing
+var wedding: RatWedding
 var cam: Camera3D
 var env: Environment
 var ui: GameUI
 var sfx: Sfx
 
-var time_left := 0.0
-var night_len := 30.0
-var caught_night := 0
-var fish_night := 0.0
-var combo := 0
-var _combo_t := 0.0
+# --- run state
+var t := 0.0
+var level := 1
+var xp := 0.0
+var xp_next := 5.0
+var lives := 9
+var max_lives := 9
+var kills := 0
+var fish_run := 0.0
+var passives := {}
+var rerolls := 0
+var revives := 0
+var pending_levels := 0
+var boss_spawned := false
+var wedding_done := false
+var won := false
+var offers: Array = []
+var _invuln := 0.0
 var _spawn_acc := 0.0
 var _shake := 0.0
-var _wave_t := 6.0
-var traps: Array[Node3D] = []
-var owls: Array[Node3D] = []
-var _cam_zoom := 1.0
-const CAM_OFF := Vector3(0, 10.5, 12.5)   # ~40° pitch: shows faces, not just backs
+var _pop_budget := 0
+var _hpm_t := 0.0
 
 func _ready() -> void:
 	randomize()
 	_environment()
-	village = Village.new()
-	add_child(village)
-	village.build(Progress.areas)
-	swarm = MiceSwarm.new()
-	add_child(swarm)
-	swarm.caught.connect(_on_caught)
-	player = Cat.new()
-	add_child(player)
-	player.global_position = Vector3(0, 0, 3)
+	village = Village.new(); add_child(village)
+	village.build(Upgrades.AREAS.size())
+	village.set_unlocked(Upgrades.AREAS.size())
+	swarm = MiceSwarm.new(); add_child(swarm)
+	swarm.killed.connect(_on_killed)
+	swarm.bite.connect(on_bite)
+	swarm.holes = village.holes(); swarm.obstacles = village.obstacles; swarm.inside = village.inside
+	rice = RiceField.new(); add_child(rice)
+	rice.collected.connect(_on_rice)
+	weapons = Weapons.new(); add_child(weapons); weapons.game = self
+	player = Cat.new(); add_child(player)
 	player.bounds = village.clamp_inside
+	player.swarm = swarm
 	player.pounced.connect(func(): sfx.play("whoosh", -6.0))
 	player.landed.connect(_on_player_landed)
-	player.swarm = swarm
-	player.apply_skin(Progress.skin)
-	Progress.skin_changed.connect(func(): player.apply_skin(Progress.skin))
-	cam = Camera3D.new(); cam.fov = 40.0; cam.far = 300.0
-	add_child(cam); cam.current = true
+	swarm.player = player; rice.player = player
+	cam = Camera3D.new(); cam.fov = 42.0; cam.far = 400.0; add_child(cam); cam.current = true
 	sfx = Sfx.new(); add_child(sfx)
 	ui = GameUI.new(); add_child(ui)
-	ui.start_pressed.connect(start_night)
-	ui.next_pressed.connect(func(): _show_shop())
-	ui.night_pressed.connect(start_night)
-	ui.area_bought.connect(_on_area_bought)
+	ui.process_mode = Node.PROCESS_MODE_ALWAYS
+	ui.play_pressed.connect(show_select)
+	ui.start_run_pressed.connect(start_run)
+	ui.card_picked.connect(pick_card)
+	ui.reroll_pressed.connect(reroll)
+	ui.result_done.connect(show_select)
+	ui.shop_pressed.connect(func(): phase = Phase.SHOP; ui.show_shop())
+	ui.shop_back.connect(show_select)
+	ui.resume_pressed.connect(_resume)
+	ui.quit_run_pressed.connect(func(): get_tree().paused = false; _end_run(false))
 	Progress.brightness_changed.connect(_apply_brightness)
 	_apply_brightness(Progress.brightness)
-	_apply_stats()
+	player.apply_skin(RunDefs.CHARACTERS[Progress.character].skin)
+	player.global_position = RunDefs.STAGES[Progress.stage].start
 	_place_cam(true)
 	if "--autostart" in OS.get_cmdline_user_args():
-		start_night()
+		start_run()
 	else:
 		ui.show_title()
+
+func _unhandled_input(e: InputEvent) -> void:
+	if e.is_action_pressed("pause"):
+		if phase == Phase.RUN:
+			phase = Phase.PAUSED; get_tree().paused = true; ui.show_pause()
+		elif phase == Phase.PAUSED:
+			_resume()
+
+func _resume() -> void:
+	if phase == Phase.PAUSED:
+		phase = Phase.RUN; get_tree().paused = false; ui.show_hud()
 
 # ---------------------------------------------------------------- environment
 func _environment() -> void:
@@ -73,42 +103,25 @@ func _environment() -> void:
 	env.ambient_light_color = Color(0.32, 0.3, 0.55)
 	env.ambient_light_energy = 0.7
 	env.tonemap_mode = Environment.TONE_MAPPER_FILMIC
-	env.glow_enabled = true
-	env.glow_intensity = 0.9
-	env.glow_bloom = 0.12
-	env.glow_hdr_threshold = 0.9
-	env.fog_enabled = true
-	env.fog_light_color = Color(0.12, 0.1, 0.25)
-	env.fog_density = 0.012
-	env.fog_sky_affect = 0.0
-	env.ssao_enabled = true
-	env.ssao_radius = 1.2
-	env.ssao_intensity = 2.2
-	env.adjustment_enabled = true
-	env.adjustment_saturation = 1.15
-	env.adjustment_contrast = 1.05
+	env.glow_enabled = true; env.glow_intensity = 0.9; env.glow_bloom = 0.12; env.glow_hdr_threshold = 0.9
+	env.fog_enabled = true; env.fog_light_color = Color(0.12, 0.1, 0.25); env.fog_density = 0.01; env.fog_sky_affect = 0.0
+	env.ssao_enabled = true; env.ssao_radius = 1.2; env.ssao_intensity = 2.2
+	env.adjustment_enabled = true; env.adjustment_saturation = 1.15; env.adjustment_contrast = 1.05
 	we.environment = env
 	add_child(we)
 	var moon := DirectionalLight3D.new()
-	moon.light_color = Color(0.62, 0.7, 1.0)
-	moon.light_energy = 1.15
+	moon.light_color = Color(0.62, 0.7, 1.0); moon.light_energy = 1.15
 	moon.rotation_degrees = Vector3(-55, -35, 0)
-	moon.shadow_enabled = true
-	moon.directional_shadow_max_distance = 80.0
+	moon.shadow_enabled = true; moon.directional_shadow_max_distance = 60.0
 	add_child(moon)
-	# full moon disc low in the sky (seen at the top of the screen)
-	var m := MeshInstance3D.new(); m.mesh = Toon.sphere(4.0)
-	m.material_override = Toon.glow(Color(1.0, 0.95, 0.8), 2.5)
-	m.position = Vector3(-20, 30, -70); add_child(m)
-	# fireflies
 	var fx := GPUParticles3D.new()
-	fx.amount = 160; fx.lifetime = 6.0; fx.preprocess = 6.0
+	fx.amount = 220; fx.lifetime = 6.0; fx.preprocess = 6.0
 	var pm := ParticleProcessMaterial.new()
 	pm.emission_shape = ParticleProcessMaterial.EMISSION_SHAPE_BOX
-	pm.emission_box_extents = Vector3(32, 1.5, 32)
+	pm.emission_box_extents = Vector3(55, 1.5, 45)
 	pm.gravity = Vector3.ZERO
 	pm.initial_velocity_min = 0.1; pm.initial_velocity_max = 0.4
-	pm.direction = Vector3(0, 1, 0); pm.spread = 180.0
+	pm.spread = 180.0
 	pm.turbulence_enabled = true; pm.turbulence_noise_strength = 0.6
 	var curve := Curve.new(); curve.add_point(Vector2(0, 0)); curve.add_point(Vector2(0.2, 1)); curve.add_point(Vector2(0.8, 1)); curve.add_point(Vector2(1, 0))
 	var ct := CurveTexture.new(); ct.curve = curve; pm.scale_curve = ct
@@ -118,263 +131,344 @@ func _environment() -> void:
 	qm.billboard_mode = BaseMaterial3D.BILLBOARD_ENABLED; qm.albedo_color = Color(0.85, 1.0, 0.45)
 	qm.emission_enabled = true; qm.emission = Color(0.8, 1.0, 0.4); qm.emission_energy_multiplier = 4.0
 	q.material = qm; fx.draw_pass_1 = q
-	fx.position = Vector3(0, 1.5, 12)
-	fx.visibility_aabb = AABB(Vector3(-40, -5, -40), Vector3(80, 10, 80))
+	fx.position = Vector3(0, 1.5, 20)
+	fx.visibility_aabb = AABB(Vector3(-70, -5, -60), Vector3(140, 10, 120))
 	add_child(fx)
 
 func _apply_brightness(v: float) -> void:
 	env.ambient_light_energy = 0.7 * v
 	env.tonemap_exposure = 1.0 * v
 
-# ---------------------------------------------------------------- stats
-func _apply_stats() -> void:
-	player.speed = Upgrades.move_speed(Progress.lv("speed"))
-	player.catch_radius = Upgrades.catch_radius(Progress.lv("claw"))
-	player.pounce_dist = Upgrades.pounce_distance(Progress.lv("pounce"))
-	player.pounce_cd = Upgrades.pounce_cooldown(Progress.lv("pounce"))
-	player.max_charges = Upgrades.charges(Progress.lv("charges"))
-	night_len = Upgrades.night_seconds(Progress.lv("time"))
-	swarm.magnet = Upgrades.magnet_radius(Progress.lv("whisker"))
-	village.set_unlocked(Progress.areas)
-	swarm.holes = village.holes()
-	swarm.obstacles = village.obstacles
-	swarm.inside = village.inside
-	# kittens
-	var want := Upgrades.kittens(Progress.lv("kitten"))
-	var colors := [Color(0.95, 0.6, 0.3), Color(0.15, 0.14, 0.16), Color(0.92, 0.9, 0.86), Color(0.7, 0.62, 0.55)]
-	while kittens.size() < want:
-		var k := Cat.new()
-		k.is_player = false
-		k.size = 0.62
-		k.fur = colors[kittens.size() % colors.size()]
-		k.stripe = k.fur.darkened(0.35)
-		k.swarm = swarm
-		k.bounds = village.clamp_inside
-		add_child(k)
-		k.global_position = player.global_position + Vector3(randf_range(-2, 2), 0, randf_range(1, 3))
-		kittens.append(k)
-	for k in kittens:
-		k.speed = player.speed * 0.8
-		k.catch_radius = player.catch_radius
-		k.pounce_dist = player.pounce_dist * 0.8
-		k.pounce_cd = player.pounce_cd * 1.5
-	_sync_traps()
-	_sync_owls()
-	var all: Array[Cat] = [player]
-	all.append_array(kittens)
-	swarm.cats = all
-	swarm.player = player
+# ---------------------------------------------------------------- derived stats
+func plv(id: String) -> int:
+	return int(passives.get(id, 0))
 
-# ---------------------------------------------------------------- night loop
-func start_night() -> void:
+func might() -> float:
+	return (1.0 + 0.12 * plv("might")) * (1.0 + 0.08 * Progress.mlv("m_might"))
+
+func fish_mult() -> float:
+	return float(RunDefs.STAGES[Progress.stage].fish) * pow(1.5, Progress.heat) * (1.0 + 0.15 * plv("fish")) * (1.0 + 0.12 * Progress.mlv("m_greed"))
+
+func _apply_stats() -> void:
+	player.speed = 7.0 * (1.0 + 0.1 * plv("speed")) * (1.0 + 0.05 * Progress.mlv("m_speed"))
+	player.catch_radius = 1.0
+	player.pounce_dist = 4.5
+	player.pounce_cd = 1.2 * _cd_mult()
+	rice.magnet = 2.2 * (1.0 + 0.4 * plv("whisker")) * (1.0 + 0.2 * Progress.mlv("m_magnet"))
+	weapons.might = might()
+	weapons.cd_mult = _cd_mult()
+
+func _cd_mult() -> float:
+	return maxf(0.3, (1.0 - 0.08 * plv("bell")) * (1.0 - 0.04 * Progress.mlv("m_cd")))
+
+# ---------------------------------------------------------------- run lifecycle
+func show_select() -> void:
+	get_tree().paused = false
+	phase = Phase.SELECT
+	_clear_run()
+	player.apply_skin(RunDefs.CHARACTERS[Progress.character].skin)
+	player.global_position = RunDefs.STAGES[Progress.stage].start
+	ui.show_select()
+
+func _clear_run() -> void:
+	swarm.clear(); rice.clear(); weapons.clear()
+	if is_instance_valid(boss): boss.queue_free()
+	if is_instance_valid(wedding): wedding.queue_free()
+	boss = null; wedding = null
+
+func start_run() -> void:
+	_clear_run()
+	get_tree().paused = false
+	var ch: Dictionary = RunDefs.CHARACTERS[Progress.character]
+	player.apply_skin(ch.skin)
+	player.global_position = RunDefs.STAGES[Progress.stage].start
+	t = 0.0; level = 1; xp = 0.0; xp_next = RunDefs.xp_to_next(1); kills = 0; fish_run = 0.0
+	passives = {}
+	max_lives = 9 + Progress.mlv("m_life"); lives = max_lives
+	rerolls = Progress.mlv("m_reroll"); revives = Progress.mlv("m_revive")
+	pending_levels = 0; boss_spawned = false; wedding_done = false; won = false
+	weapons.levels[ch.weapon] = 1
+	passives[ch.perk] = int(ch.get("perk_lv", 1))
+	if ch.perk == "bowl":
+		max_lives += passives[ch.perk]; lives = max_lives
 	_apply_stats()
-	swarm.clear()
-	time_left = night_len
-	caught_night = 0
-	fish_night = 0.0
-	combo = 0
-	_wave_t = 4.0
-	for t in traps:
-		t.set_meta("cd", 0.0)
-	phase = Phase.HUNT
+	_update_hp_mult()
+	for i in 10:
+		_spawn_one(true)
+	phase = Phase.RUN
 	ui.show_hud()
-	# a few mice already out so the first seconds aren't empty
-	for i in mini(6 + 2 * Progress.areas, Upgrades.max_mice(Progress.lv("spawn"), Progress.areas)):
-		_spawn_one(_roll_kind())
+	ui.banner(RunDefs.STAGES[Progress.stage].name + ("" if Progress.heat == 0 else "  ·  Đêm rằm +%d" % Progress.heat))
+
+func _update_hp_mult() -> void:
+	swarm.hp_mult = RunDefs.mouse_hp(1.0, t / 60.0, Progress.stage) * pow(1.6, Progress.heat)
 
 func _process(dt: float) -> void:
 	_place_cam(false, dt)
-	if phase != Phase.HUNT:
+	_pop_budget = 6
+	if phase != Phase.RUN:
 		return
-	time_left -= dt
-	_combo_t -= dt
-	if _combo_t <= 0.0:
-		combo = 0
-	_spawn_acc += dt * Upgrades.spawn_per_second(Progress.lv("spawn"), Progress.areas)
+	if not boss_spawned:
+		t += dt
+	_invuln = maxf(0.0, _invuln - dt)
+	_hpm_t -= dt
+	if _hpm_t <= 0.0:
+		_hpm_t = 1.0; _update_hp_mult()
+	_director(dt)
+	if not wedding_done and t >= RunDefs.WEDDING_AT:
+		_start_wedding()
+	if not boss_spawned and t >= RunDefs.NIGHT_SECONDS:
+		_spawn_boss()
+	if pending_levels > 0 and phase == Phase.RUN:
+		_open_levelup()
+	ui.update_hud({"t": t, "total": RunDefs.NIGHT_SECONDS, "lives": lives, "max_lives": max_lives, "level": level,
+		"xp": xp / xp_next, "kills": kills, "fish": fish_run, "cool": player.cooldown_ratio(),
+		"charges": player.charges_left(), "boss": boss_spawned})
+
+# ---------------------------------------------------------------- director
+func _director(dt: float) -> void:
+	var minute := t / 60.0
+	var rate := RunDefs.spawn_rate(minute, Progress.stage) * (1.0 + 0.2 * Progress.heat)
+	if boss_spawned:
+		rate *= 0.4
+	_spawn_acc += dt * rate
+	var cap := RunDefs.max_alive(minute)
 	while _spawn_acc >= 1.0:
 		_spawn_acc -= 1.0
-		if swarm.count() < Upgrades.max_mice(Progress.lv("spawn"), Progress.areas):
-			_spawn_one(_roll_kind())
-	# đàn chuột: periodic bursts from one hole
-	var ws := Upgrades.wave_size(Progress.lv("wave"))
-	if ws > 0:
-		_wave_t -= dt
-		if _wave_t <= 0.0:
-			_wave_t = 6.0
-			var h: Vector3 = swarm.holes[randi() % swarm.holes.size()] if not swarm.holes.is_empty() else Vector3.ZERO
-			for i in ws:
-				swarm.spawn(_roll_kind(), h + Vector3(randf_range(-0.8, 0.8), 0, randf_range(-0.8, 0.8)))
-			ui.flash("Đàn chuột!")
-	_update_traps(dt)
-	_update_owls(dt)
-	ui.update_hud(time_left, night_len, caught_night, Progress.fish, combo, player.cooldown_ratio(), player.charges_left(), player.max_charges)
-	if time_left <= 0.0:
-		_end_night()
-
-## Half the mice pop out of the ground near the cat (so there is always something to chase on the
-## big map); the rest come from the holes at the edges.
-func _spawn_one(k: int) -> void:
-	if randf() < 0.5:
-		for t in 8:
-			var a := randf() * TAU
-			var p := player.global_position + Vector3(cos(a), 0, sin(a)) * randf_range(6.0, 14.0)
-			if village.inside(p):
-				swarm.spawn(k, p)
-				return
-	swarm.spawn_at_random_hole(k)
+		if swarm.count() < cap:
+			_spawn_one()
 
 func _roll_kind() -> int:
-	if randf() < Upgrades.golden_chance(Progress.lv("luck")):
+	var minute := t / 60.0
+	var allowed: Array = RunDefs.STAGES[Progress.stage].kinds
+	if randf() < 0.015:
 		return MiceSwarm.Kind.VANG
-	if Progress.areas >= 6 and randf() < 0.12:
+	var r := randf()
+	if "ma" in allowed and minute >= 3.0 and r < 0.12:
 		return MiceSwarm.Kind.MA
-	if Progress.areas >= 2 and randf() < 0.25:
+	if "chu" in allowed and minute >= 1.5 and r < 0.25:
+		return MiceSwarm.Kind.CHU
+	if minute >= 0.75 and r < clampf(0.25 + 0.1 * minute, 0.0, 0.6):
 		return MiceSwarm.Kind.CONG
 	return MiceSwarm.Kind.NHAT
 
-func _on_caught(p: Vector3, kind: int, by_player: bool) -> void:
-	caught_night += 1
-	combo += 1
-	_combo_t = Upgrades.combo_window(Progress.lv("combo"))
-	time_left += Upgrades.time_per_catch(Progress.lv("clock"))
-	var base: float = MiceSwarm.KINDS[kind].fish
-	var mult := Upgrades.bounty_mult(Progress.lv("bounty"), Progress.souls) * (1.0 + Upgrades.combo_bonus(Progress.lv("combo")) * mini(combo - 1, 30))
-	var triple := randf() < Upgrades.triple_chance(Progress.lv("double"))
-	if triple:
-		mult *= 3.0
-	var gain := base * mult
-	fish_night += gain
-	Progress.add_fish(gain)
-	Juice.popup(self, p + Vector3(0, 0.8, 0), ("+%s ×3" if triple else "+%s") % BigNum.fmt(gain), Color(1.0, 0.85, 0.35) if (triple or kind == MiceSwarm.Kind.VANG) else Color(0.85, 0.95, 1.0))
-	Juice.burst(self, p, MiceSwarm.KINDS[kind].color)
-	Juice.fish(self, p)
-	sfx.play("pop", -4.0, 1.0 + minf(combo, 12) * 0.04)
-	if by_player:
-		_shake = minf(_shake + 0.18, 0.5)
+## Mice appear in a ring just off-screen around the cat (survivors-style); edge holes as fallback.
+func _spawn_one(near := false) -> void:
+	var k := MiceSwarm.Kind.NHAT if near else _roll_kind()
+	for tries in 8:
+		var a := randf() * TAU
+		var r := randf_range(5.0, 10.0) if near else randf_range(15.0, 21.0)
+		var p := player.global_position + Vector3(cos(a) * r, 0, sin(a) * r * 0.8)
+		if village.inside(p):
+			swarm.spawn(k, p)
+			return
+	swarm.spawn_at_random_hole(k)
+
+# ---------------------------------------------------------------- combat plumbing
+## Every weapon hits through here: mice, the boss and the wedding palanquin.
+func hit(center: Vector3, r: float, dmg: float, dir := Vector3.ZERO, arc := TAU, knock := 2.0) -> int:
+	var n := swarm.damage_in(center, r, dmg, dir, arc, knock)
+	if is_instance_valid(boss):
+		boss.try_hit(center, r, dmg)
+	if is_instance_valid(wedding):
+		wedding.try_hit(center, r, dmg)
+	return n
+
+func on_bite(dmg: int) -> void:
+	if phase != Phase.RUN or _invuln > 0.0 or player.is_pouncing():
+		return
+	lives -= dmg
+	_invuln = 1.0
+	shake(0.35)
+	sfx.play("click", 0.0, 0.5)
+	ui.hurt()
+	if lives <= 0:
+		if revives > 0:
+			revives -= 1
+			lives = maxi(1, max_lives / 2)
+			_invuln = 2.0
+			hit(player.global_position, 9.0, 99999.0, Vector3.ZERO, TAU, 8.0)
+			Juice.ring(self, player.global_position, 9.0)
+			ui.banner("Chín kiếp mèo: sống lại!")
+		else:
+			_end_run(false)
 
 func _on_player_landed(at: Vector3) -> void:
 	Juice.dust(self, at)
-	var r := Upgrades.shock_radius(Progress.lv("shock"))
-	if r > 0.0 and phase == Phase.HUNT:
-		Juice.ring(self, at, r)
-		if swarm.catch_in(at, r, true) > 0:
-			_shake = minf(_shake + 0.25, 0.6)
+	if phase == Phase.RUN:
+		hit(at, 1.9, 30.0 * might(), Vector3.ZERO, TAU, 3.0)
 
-# ---------------------------------------------------------------- helpers: traps & owls
-func _rand_point() -> Vector3:
-	var rs: Array[Rect2] = []
-	for i in mini(Progress.areas, village.rects.size()):
-		rs.append(village.rects[i])
-	for k in 30:
-		var r: Rect2 = rs[randi() % rs.size()].grow(-2.0)
-		var p := Vector3(randf_range(r.position.x, r.end.x), 0, randf_range(r.position.y, r.end.y))
-		var ok := true
-		for o in village.obstacles:
-			if Vector2(p.x - o[0].x, p.z - o[0].z).length() < o[1] + 0.8:
-				ok = false; break
-		if ok:
-			return p
-	return Vector3.ZERO
+func _on_killed(p: Vector3, kind: int) -> void:
+	kills += 1
+	var d: Dictionary = MiceSwarm.KINDS[kind]
+	rice.drop(p, float(d.xp))
+	var gain: float = float(d.fish) * fish_mult()
+	fish_run += gain
+	if _pop_budget > 0:
+		_pop_budget -= 1
+		Juice.burst(self, p, d.color)
+		sfx.play("pop", -10.0, 1.0 + randf() * 0.3)
+	if kind == MiceSwarm.Kind.VANG:
+		Juice.popup(self, p + Vector3(0, 0.8, 0), "+" + BigNum.fmt(gain), Color(1.0, 0.85, 0.35))
+		Juice.fish(self, p)
 
-func _sync_traps() -> void:
-	var want := Upgrades.traps(Progress.lv("trap"))
-	while traps.size() < want:
-		var t := Node3D.new()
-		# bamboo spring trap: woven base + bent bamboo arm
-		t.add_child(Toon.part(Toon.cyl(0.55, 0.6, 0.12, 12), Color(0.7, 0.6, 0.35), Vector3(0, 0.06, 0), Vector3.ONE, true, {"stripes": 40.0, "stripe_color": Color(0.55, 0.45, 0.25), "stripe_axis": Vector3(1, 0, 1)}))
-		var arm := Node3D.new(); arm.position = Vector3(0, 0.15, 0.45); t.add_child(arm)
-		var bar := Toon.part(Toon.cyl(0.04, 0.04, 0.9, 6), Color(0.55, 0.65, 0.3), Vector3(0, 0.4, 0)); arm.add_child(bar)
-		arm.rotation.x = -1.2
-		t.set_meta("arm", arm); t.set_meta("cd", 0.0)
-		add_child(t)
-		t.global_position = _rand_point()
-		traps.append(t)
+func _on_rice(v: float) -> void:
+	xp += v * (1.0 + 0.1 * Progress.mlv("m_growth"))
+	while xp >= xp_next:
+		xp -= xp_next
+		level += 1
+		xp_next = RunDefs.xp_to_next(level)
+		pending_levels += 1
 
-func _update_traps(dt: float) -> void:
-	for t in traps:
-		var cd: float = t.get_meta("cd") - dt
-		var arm: Node3D = t.get_meta("arm")
-		arm.rotation.x = lerpf(arm.rotation.x, -1.2 if cd <= 0.0 else 0.0, 1.0 - exp(-12.0 * dt))
-		if cd <= 0.0 and swarm.catch_in(t.global_position, 0.8) > 0:
-			cd = 2.5
-			arm.rotation.x = 0.2
-			sfx.play("click", -2.0, 0.7)
-		t.set_meta("cd", cd)
+func shake(v: float) -> void:
+	_shake = minf(_shake + v, 0.7)
 
-func _sync_owls() -> void:
-	var want := Upgrades.owls(Progress.lv("owl"))
-	while owls.size() < want:
-		var o := Node3D.new()
-		var body := Toon.part(Toon.sphere(0.45), Color(0.55, 0.45, 0.35), Vector3.ZERO, Vector3(1, 1.15, 0.9)); o.add_child(body)
-		o.add_child(Toon.part(Toon.sphere(0.32), Color(0.85, 0.78, 0.65), Vector3(0, -0.05, -0.25), Vector3(1, 1.1, 0.6), false))
-		for sx in [-1.0, 1.0]:
-			var e := MeshInstance3D.new(); e.mesh = Toon.sphere(0.12); e.material_override = Toon.glow(Color(1.0, 0.75, 0.2), 3.0)
-			e.position = Vector3(0.17 * sx, 0.2, -0.36); o.add_child(e)
-			var wing := Toon.part(Toon.sphere(0.35), Color(0.45, 0.36, 0.28), Vector3(0.45 * sx, 0.0, 0.05), Vector3(0.35, 0.9, 0.8))
-			wing.name = "wing%d" % (0 if sx < 0 else 1)
-			o.add_child(wing)
-			o.add_child(Toon.part(Toon.cone(0.1, 0.25, 4), Color(0.45, 0.36, 0.28), Vector3(0.2 * sx, 0.55, 0)))
-		o.set_meta("a", randf() * TAU); o.set_meta("t", randf() * 2.0); o.set_meta("dive", 0.0)
-		add_child(o)
-		owls.append(o)
+# ---------------------------------------------------------------- level-up cards
+func _open_levelup() -> void:
+	pending_levels -= 1
+	offers = build_offers()
+	phase = Phase.LEVELUP
+	get_tree().paused = true
+	sfx.play("chime", -8.0, 1.2)
+	ui.show_levelup(offers, rerolls, level)
 
-func _update_owls(dt: float) -> void:
-	var c := player.global_position
-	for i in owls.size():
-		var o := owls[i]
-		var a: float = o.get_meta("a") + dt * 0.6
-		o.set_meta("a", a)
-		var t: float = o.get_meta("t") - dt
-		var dive: float = o.get_meta("dive")
-		var circle := c + Vector3(cos(a + i) * 9.0, 6.0, sin(a + i) * 9.0)
-		if dive > 0.0:
-			dive -= dt
-			var target: Vector3 = o.get_meta("target")
-			o.global_position = o.global_position.lerp(target + Vector3(0, 0.4, 0), 1.0 - exp(-10.0 * dt))
-			if dive <= 0.0:
-				swarm.catch_in(target, 1.3)
-		else:
-			o.global_position = o.global_position.lerp(circle, 1.0 - exp(-3.0 * dt))
-			if t <= 0.0:
-				t = maxf(1.0, 3.0 - 0.3 * Progress.lv("owl"))
-				var n = swarm.nearest(Vector3(o.global_position.x, 0, o.global_position.z), 14.0)
-				if n != null:
-					o.set_meta("target", n); dive = 0.45
-		o.set_meta("t", t); o.set_meta("dive", dive)
-		o.look_at(o.global_position + Vector3(-sin(a + i), 0, cos(a + i)), Vector3.UP)
-		var flap := sin(Time.get_ticks_msec() * 0.02 + i) * 0.6
-		o.get_node("wing0").rotation.z = flap
-		o.get_node("wing1").rotation.z = -flap
+## Returns up to 3 card dicts: {type: weapon|passive|evo|heal|fish, id, lv, name, desc}.
+func build_offers() -> Array:
+	var pool := []
+	for id in RunDefs.WEAPONS:
+		var w: Dictionary = RunDefs.WEAPONS[id]
+		if weapons.levels.has(id):
+			var lv: int = weapons.levels[id]
+			if lv >= RunDefs.MAX_WEAPON_LV and not weapons.evolved.get(id, false) and plv(w.evo) > 0:
+				pool.append({"type": "evo", "id": id, "name": w.evo_name, "desc": w.evo_desc, "lv": 0, "w": 100.0})
+			elif lv < RunDefs.MAX_WEAPON_LV:
+				pool.append({"type": "weapon", "id": id, "name": w.name, "desc": w.desc, "lv": lv + 1, "w": 3.0})
+		elif weapons.levels.size() < RunDefs.MAX_WEAPONS:
+			pool.append({"type": "weapon", "id": id, "name": w.name, "desc": w.desc, "lv": 1, "w": 2.0})
+	for id in RunDefs.PASSIVES:
+		var p: Dictionary = RunDefs.PASSIVES[id]
+		var lv := plv(id)
+		if lv > 0 and lv < RunDefs.MAX_PASSIVE_LV:
+			pool.append({"type": "passive", "id": id, "name": p.name, "desc": p.desc, "lv": lv + 1, "w": 2.0})
+		elif lv == 0 and passives.size() < RunDefs.MAX_PASSIVES:
+			pool.append({"type": "passive", "id": id, "name": p.name, "desc": p.desc, "lv": 1, "w": 1.5})
+	var out := []
+	for k in 3:
+		if pool.is_empty():
+			break
+		var total := 0.0
+		for c in pool:
+			total += c.w
+		var r := randf() * total
+		for c in pool:
+			r -= c.w
+			if r <= 0.0:
+				out.append(c); pool.erase(c); break
+	if out.size() < 3:
+		out.append({"type": "heal", "id": "", "name": "Bát cháo", "desc": "Hồi 3 mạng", "lv": 0})
+	if out.size() < 3:
+		out.append({"type": "fish", "id": "", "name": "Xâu cá khô", "desc": "+%s cá" % BigNum.fmt(25.0 * fish_mult()), "lv": 0})
+	return out
 
-func _end_night() -> void:
-	phase = Phase.SUMMARY
-	swarm.clear()
-	var record := caught_night > Progress.best_night
-	Progress.end_night(caught_night)
-	sfx.play("chime", -6.0)
-	ui.show_summary(caught_night, fish_night, record)
+func pick_card(i: int) -> void:
+	if phase != Phase.LEVELUP or i >= offers.size():
+		return
+	apply_card(offers[i])
+	sfx.play("coin", -2.0)
+	get_tree().paused = false
+	phase = Phase.RUN
+	ui.show_hud()
 
-func _show_shop() -> void:
-	phase = Phase.SHOP
-	ui.show_shop()
-
-func _on_area_bought() -> void:
-	village.set_unlocked(Progress.areas)
+func apply_card(c: Dictionary) -> void:
+	match c.type:
+		"weapon": weapons.levels[c.id] = c.lv
+		"evo":
+			weapons.evolved[c.id] = true
+			ui.banner("Tiến hóa: " + c.name + "!")
+		"passive":
+			passives[c.id] = c.lv
+			if c.id == "bowl":
+				max_lives += 1; lives = mini(max_lives, lives + 2)
+		"heal": lives = mini(max_lives, lives + 3)
+		"fish": fish_run += 25.0 * fish_mult()
 	_apply_stats()
+
+func reroll() -> void:
+	if phase != Phase.LEVELUP or rerolls <= 0:
+		return
+	rerolls -= 1
+	offers = build_offers()
+	ui.show_levelup(offers, rerolls, level)
+
+# ---------------------------------------------------------------- events
+func _start_wedding() -> void:
+	wedding_done = true
+	wedding = RatWedding.new(); add_child(wedding)
+	var c := player.global_position
+	var side := Vector3(1, 0, 0).rotated(Vector3.UP, randf() * TAU)
+	var from := village.clamp_inside(c - side * 22.0 + Vector3(0, 0, -4))
+	var to := village.clamp_inside(c + side * 22.0 + Vector3(0, 0, 4))
+	wedding.setup(self, from, to, 350.0 * swarm.hp_mult)
+	wedding.opened.connect(_on_chest)
+	ui.banner("Đám cưới chuột! Phá kiệu để nhận rương báu")
+	sfx.play("unlock", -4.0)
+
+func _on_chest(at: Vector3) -> void:
+	Juice.ring(self, at, 4.0)
+	Juice.popup(self, at + Vector3(0, 1.5, 0), "Rương báu!", Color(1.0, 0.85, 0.35))
+	pending_levels += 2
+	var bonus := 60.0 * fish_mult()
+	fish_run += bonus
+	rice.pull_all()
+	shake(0.4)
+	sfx.play("unlock", -2.0)
+
+func _spawn_boss() -> void:
+	boss_spawned = true
+	boss = RatKing.new(); add_child(boss)
+	var a := randf() * TAU
+	boss.global_position = village.clamp_inside(player.global_position + Vector3(cos(a), 0, sin(a)) * 14.0)
+	boss.setup(self, float(RunDefs.STAGES[Progress.stage].boss_hp) * pow(1.6, Progress.heat))
+	boss.died.connect(_on_boss_died)
+	boss.hp_changed.connect(func(r): ui.boss_bar(r))
+	ui.boss_bar(1.0)
+	ui.banner("Chuột Chúa xuất hiện!")
+	sfx.play("unlock", 0.0, 0.6)
+	shake(0.5)
+
+func _on_boss_died(at: Vector3) -> void:
+	won = true
+	Juice.ring(self, at, 8.0)
+	hit(at, 30.0, 99999.0)
+	fish_run += 300.0 * fish_mult()
+	rice.pull_all()
+	shake(0.7)
+	ui.banner("Hạ Chuột Chúa!")
+	await get_tree().create_timer(2.0).timeout
+	if phase == Phase.RUN:
+		_end_run(true)
+
+func _end_run(victory: bool) -> void:
+	if phase == Phase.RESULT:
+		return
+	phase = Phase.RESULT
+	get_tree().paused = false
+	var survived_bonus := fish_run * (0.5 if victory else 0.0)
+	var total := fish_run + survived_bonus
+	Progress.add_fish(total)
+	var unlocked := Progress.end_night(victory, t, kills)
+	_clear_run()
+	sfx.play("chime", -6.0)
+	ui.show_result({"won": victory, "t": t, "kills": kills, "level": level, "fish": total, "unlocked": unlocked})
 
 # ---------------------------------------------------------------- camera
 func _place_cam(snap: bool, dt := 0.016) -> void:
-	var target_zoom := 1.0 + 0.12 * (Progress.areas - 1) + 0.03 * Progress.lv("kitten")
-	_cam_zoom = lerpf(_cam_zoom, target_zoom, 1.0 - exp(-2.0 * dt))
 	var focus := player.global_position
-	if phase != Phase.HUNT:
-		focus = focus.lerp(Vector3(0, 0, 0), 0.3)
-	var goal := focus + Vector3(0, 0, -1.5) + CAM_OFF * _cam_zoom
+	var goal := focus + Vector3(0, 0, -1.0) + CAM_OFF
 	if snap:
 		cam.global_position = goal
 	else:
-		cam.global_position = cam.global_position.lerp(goal, 1.0 - exp(-5.0 * dt))
+		cam.global_position = cam.global_position.lerp(goal, 1.0 - exp(-6.0 * dt))
 	_shake = maxf(0.0, _shake - dt * 1.8)
-	var sh := Vector3(randf_range(-1, 1), randf_range(-1, 1), 0) * _shake * 0.25
+	var sh := Vector3(randf_range(-1, 1), randf_range(-1, 1), 0) * _shake * 0.3
 	cam.look_at(cam.global_position - CAM_OFF.normalized() + sh * 0.02, Vector3.UP)
 	cam.global_position += sh

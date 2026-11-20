@@ -1,5 +1,5 @@
 extends Node
-## Persistent progression + settings (user://save.json).
+## Persistent meta progression + settings (user://save.json).
 
 signal changed
 signal brightness_changed(v: float)
@@ -8,25 +8,28 @@ const SAVE := "user://save.json"
 
 var fish := 0.0
 var lifetime_fish := 0.0
-var levels := {}            ## upgrade id -> level
-var areas := 1              ## number of unlocked regions
-var souls := 0              ## prestige currency (Chín kiếp)
-var lives_used := 0
-var best_night := 0         ## most mice in one night
+var meta := {}                    ## RunDefs.META id -> level
+var chars_owned := ["muop"]
+var character := "muop"
+var stages_open := 1              ## how many stages are unlocked (1..5)
+var stage := 0                    ## selected stage index
+var heat := 0                     ## endless difficulty after clearing the last stage ("Đêm rằm +N")
+var best := {}                    ## "stage:heat" -> {"time": s, "kills": n, "won": bool}
 var nights := 0
+var total_kills := 0
 var brightness := 1.0
-var skins_owned := ["muop"]
-var skin := "muop"
-signal skin_changed
 
 func _ready() -> void:
 	_bind("move_up", [KEY_W, KEY_UP]); _bind("move_down", [KEY_S, KEY_DOWN])
 	_bind("move_left", [KEY_A, KEY_LEFT]); _bind("move_right", [KEY_D, KEY_RIGHT])
 	_bind("pounce", [KEY_SPACE]); _bind("pause", [KEY_ESCAPE])
+	_bind("pick_1", [KEY_1, KEY_KP_1]); _bind("pick_2", [KEY_2, KEY_KP_2]); _bind("pick_3", [KEY_3, KEY_KP_3])
+	_bind("reroll", [KEY_R])
 	_bind("update_game", [KEY_F9])
 	_bind("brightness_down", [KEY_MINUS, KEY_KP_SUBTRACT]); _bind("brightness_up", [KEY_EQUAL, KEY_KP_ADD])
 	var mb := InputEventMouseButton.new(); mb.button_index = MOUSE_BUTTON_LEFT
 	InputMap.action_add_event("pounce", mb)
+	process_mode = Node.PROCESS_MODE_ALWAYS
 	load_game()
 	if "--capture" in OS.get_cmdline_user_args():
 		add_child.call_deferred(load("res://tools/capture_v2.gd").new())
@@ -39,62 +42,55 @@ func _bind(action: String, keys: Array) -> void:
 		var ev := InputEventKey.new(); ev.physical_keycode = k
 		InputMap.action_add_event(action, ev)
 
-func lv(id: String) -> int:
-	return int(levels.get(id, 0))
+func mlv(id: String) -> int:
+	return int(meta.get(id, 0))
 
-func can_buy(id: String) -> bool:
-	return Upgrades.DEFS[id].unlock < areas and fish >= Upgrades.cost(id, lv(id))
-
-func buy(id: String) -> bool:
-	if not can_buy(id):
+func buy_meta(id: String) -> bool:
+	var c := RunDefs.meta_cost(id, mlv(id))
+	if fish < c:
 		return false
-	fish -= Upgrades.cost(id, lv(id))
-	levels[id] = lv(id) + 1
+	fish -= c
+	meta[id] = mlv(id) + 1
 	save_game(); changed.emit()
 	return true
 
-func buy_or_select_skin(id: String) -> bool:
-	if id in skins_owned:
-		skin = id
-	elif fish >= Upgrades.SKINS[id].cost:
-		fish -= Upgrades.SKINS[id].cost
-		skins_owned.append(id)
-		skin = id
+func buy_or_select_char(id: String) -> bool:
+	if id in chars_owned:
+		character = id
+	elif fish >= RunDefs.CHARACTERS[id].cost:
+		fish -= RunDefs.CHARACTERS[id].cost
+		chars_owned.append(id)
+		character = id
 	else:
 		return false
-	save_game(); changed.emit(); skin_changed.emit()
-	return true
-
-func next_area_cost() -> float:
-	return Upgrades.area_cost(areas)
-
-func buy_area() -> bool:
-	if areas >= Upgrades.AREAS.size() or fish < next_area_cost():
-		return false
-	fish -= next_area_cost()
-	areas += 1
 	save_game(); changed.emit()
 	return true
+
+func select_stage(i: int) -> void:
+	stage = clampi(i, 0, stages_open - 1)
+	save_game(); changed.emit()
 
 func add_fish(v: float) -> void:
 	fish += v
 	lifetime_fish += v
 	changed.emit()
 
-func end_night(caught: int) -> void:
+## Called when a night ends. Returns true if something new was unlocked.
+func end_night(won: bool, seconds: float, kills: int) -> bool:
 	nights += 1
-	best_night = maxi(best_night, caught)
+	total_kills += kills
+	var key := "%d:%d" % [stage, heat]
+	var b: Dictionary = best.get(key, {"time": 0.0, "kills": 0, "won": false})
+	b.time = maxf(b.time, seconds); b.kills = maxi(b.kills, kills); b.won = b.won or won
+	best[key] = b
+	var unlocked := false
+	if won:
+		if stage == stages_open - 1 and stages_open < RunDefs.STAGES.size():
+			stages_open += 1; unlocked = true
+		elif stage == RunDefs.STAGES.size() - 1 and stages_open == RunDefs.STAGES.size():
+			heat += 1; unlocked = true
 	save_game(); changed.emit()
-
-func reincarnate() -> int:
-	var s := Upgrades.souls_for(lifetime_fish)
-	if s <= 0:
-		return 0
-	souls += s
-	lives_used += 1
-	fish = 0.0; lifetime_fish = 0.0; levels = {}; areas = 1
-	save_game(); changed.emit()
-	return s
+	return unlocked
 
 func _unhandled_input(e: InputEvent) -> void:
 	if e.is_action_pressed("brightness_up"):
@@ -108,19 +104,21 @@ func set_brightness(v: float) -> void:
 	save_game()
 
 func to_dict() -> Dictionary:
-	return {"v": 2, "fish": fish, "lifetime_fish": lifetime_fish, "levels": levels, "areas": areas,
-		"souls": souls, "lives_used": lives_used, "best_night": best_night, "nights": nights, "brightness": brightness,
-		"skins_owned": skins_owned, "skin": skin}
+	return {"v": 3, "fish": fish, "lifetime_fish": lifetime_fish, "meta": meta, "chars_owned": chars_owned,
+		"character": character, "stages_open": stages_open, "stage": stage, "heat": heat, "best": best,
+		"nights": nights, "total_kills": total_kills, "brightness": brightness}
 
 func from_dict(d: Dictionary) -> void:
 	fish = float(d.get("fish", 0.0)); lifetime_fish = float(d.get("lifetime_fish", 0.0))
-	levels = d.get("levels", {}); areas = int(d.get("areas", 1)); souls = int(d.get("souls", 0))
-	lives_used = int(d.get("lives_used", 0)); best_night = int(d.get("best_night", 0))
-	nights = int(d.get("nights", 0)); brightness = float(d.get("brightness", 1.0))
-	skins_owned = d.get("skins_owned", ["muop"]); skin = d.get("skin", "muop")
+	meta = d.get("meta", {}); chars_owned = d.get("chars_owned", ["muop"]); character = d.get("character", "muop")
+	stages_open = int(d.get("stages_open", 1)); stage = int(d.get("stage", 0)); heat = int(d.get("heat", 0))
+	best = d.get("best", {}); nights = int(d.get("nights", 0)); total_kills = int(d.get("total_kills", 0))
+	brightness = float(d.get("brightness", 1.0))
+	if int(d.get("v", 3)) < 3:      # v2 save: keep the fish as a welcome gift, reset the rest
+		fish = float(d.get("fish", 0.0))
 
 func save_game() -> void:
-	if OS.has_feature("editor_hint") or "--no-save" in OS.get_cmdline_user_args():
+	if "--no-save" in OS.get_cmdline_user_args():
 		return
 	var f := FileAccess.open(SAVE, FileAccess.WRITE)
 	if f:
@@ -132,7 +130,3 @@ func load_game() -> void:
 	var d = JSON.parse_string(FileAccess.get_file_as_string(SAVE))
 	if d is Dictionary:
 		from_dict(d)
-
-func reset_all() -> void:
-	from_dict({})
-	save_game(); changed.emit()
