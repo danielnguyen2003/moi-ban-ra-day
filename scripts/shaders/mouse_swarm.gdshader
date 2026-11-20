@@ -1,44 +1,49 @@
 shader_type spatial;
-// Mice drawn with one MultiMesh. INSTANCE_CUSTOM: x = phase, y = speed01, z = scared, w = ghost.
+// v4 mice: one MultiMesh per kind, vertex-coloured meshes with animation tags in UV.x:
+// 0 body · 1 feet A · 2 feet B · 3 tail · 4 ears · 5 wings · 6 rigid accessory.
+// INSTANCE_CUSTOM: x phase, y speed01, z hit flash, w scared.  Vertex alpha < 1 = emissive part.
 render_mode diffuse_toon, specular_disabled;
 uniform vec4 shade_color : source_color = vec4(0.3, 0.28, 0.5, 1.0);
-uniform vec4 rim_color : source_color = vec4(0.6, 0.8, 1.0, 1.0);
-varying float v_ghost;
-varying float v_angry;
-varying vec3 v_col;
-varying float v_mat;
+uniform vec4 rim_color : source_color = vec4(0.65, 0.8, 1.0, 1.0);
+uniform float hover = 0.0;      // ghosts and bats float
+varying float v_flash;
 
 void vertex() {
 	float ph = INSTANCE_CUSTOM.x * 6.2831;
 	float sp = INSTANCE_CUSTOM.y;
-	float hop = abs(sin(TIME * (8.0 + 10.0 * sp) + ph));
-	// bound gait: squash on landing, stretch in the air
-	float sq = mix(1.0, 0.82 + 0.3 * hop, sp);
-	VERTEX.y *= sq;
-	VERTEX.z *= 2.0 - sq;
-	VERTEX.y += hop * 0.12 * sp;
-	// startled hops when a cat is close
-	VERTEX.y += INSTANCE_CUSTOM.z * 0.18 * abs(sin(TIME * 13.0 + ph * 2.0));
-	// tail (vertices behind the body) wiggles
-	if (VERTEX.z > 0.32) {
-		VERTEX.x += sin(TIME * 10.0 + ph + VERTEX.z * 6.0) * 0.08 * (VERTEX.z - 0.32) * 4.0;
+	float t = TIME * (7.0 + 13.0 * sp) + ph;
+	int tag = int(UV.x + 0.5);
+	float bob = abs(sin(t)) * 0.06 * sp;
+	if (tag == 1) {
+		VERTEX.z += sin(t) * 0.13 * sp;
+		VERTEX.y += max(0.0, sin(t)) * 0.07 * sp;
+	} else if (tag == 2) {
+		VERTEX.z += sin(t + 3.1416) * 0.13 * sp;
+		VERTEX.y += max(0.0, sin(t + 3.1416)) * 0.07 * sp;
+	} else if (tag == 3) {
+		float k = max(VERTEX.z - 0.25, 0.0);
+		VERTEX.x += sin(TIME * 7.0 + ph + VERTEX.z * 6.0) * 0.3 * k;
+		VERTEX.y += sin(TIME * 4.0 + ph) * 0.08 * k;
+	} else if (tag == 4) {
+		VERTEX.x += sign(VERTEX.x) * (0.02 * sin(TIME * 3.0 + ph) + 0.03 * sp * sin(t));
+	} else if (tag == 5) {
+		VERTEX.y += sin(TIME * 20.0 + ph) * abs(VERTEX.x) * 0.7;
 	}
+	// squash & stretch with the stride, plus body bob
+	float sq = 1.0 + 0.08 * sin(t * 2.0) * sp;
+	VERTEX.y = VERTEX.y * sq + bob;
+	VERTEX.y += hover * (0.35 + 0.15 * sin(TIME * 2.0 + ph));
 	// scared shiver
-	VERTEX.x += sin(TIME * 70.0 + ph) * 0.015 * INSTANCE_CUSTOM.z;
-	v_angry = step(1.5, INSTANCE_CUSTOM.w);
-	v_ghost = INSTANCE_CUSTOM.w - 2.0 * v_angry;
-	v_col = COLOR.rgb;
-	v_mat = UV.x;
+	VERTEX.x += sin(TIME * 70.0 + ph) * 0.012 * INSTANCE_CUSTOM.w;
+	v_flash = INSTANCE_CUSTOM.z;
 }
 
 void fragment() {
-	vec3 c = v_col;
-	if (v_mat > 0.75) { c = mix(vec3(0.02), vec3(1.0, 0.15, 0.1), v_angry); } else if (v_mat > 0.25) { c = vec3(0.95, 0.55, 0.62); }
+	vec3 c = mix(COLOR.rgb, vec3(1.0), v_flash * 0.85);
 	ALBEDO = c;
 	ROUGHNESS = 0.85;
 	float rim = pow(1.0 - clamp(dot(NORMAL, VIEW), 0.0, 1.0), 3.0);
-	EMISSION = (v_mat > 0.75 ? mix(vec3(0.9) * 0.15, vec3(3.0, 0.3, 0.2), v_angry) : rim_color.rgb * rim * 0.6) + v_col * v_ghost * (0.6 + 0.4 * sin(TIME * 4.0));
-
+	EMISSION = COLOR.rgb * (1.0 - COLOR.a) * 3.0 + rim_color.rgb * rim * 0.45 + vec3(1.0) * v_flash * 0.6;
 }
 
 void light() {

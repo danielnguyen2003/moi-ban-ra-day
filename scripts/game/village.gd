@@ -567,8 +567,10 @@ func _bamboo_wall() -> void:
 			continue   # gate gap
 		if _near_path(p, 1.0):
 			continue
-		xforms.append(MeshKit.xf(p, Vector3.ONE * randf_range(0.6, 0.85), Vector3(0, randf() * TAU, 0)))
-		_solid(p, 0.9)
+		if k % 2 == 0:
+			continue   # sparse, decorative only: a walled courtyard turned the first stage into a cage
+		xforms.append(MeshKit.xf(p, Vector3.ONE * randf_range(0.55, 0.75), Vector3(0, randf() * TAU, 0)))
+		_no_grass.append([p, 1.0])
 	var mm := MeshKit.scatter(_bamboo_clump_mesh(), xforms, _foliage_mat, true)
 	add_child(mm)
 

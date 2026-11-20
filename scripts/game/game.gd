@@ -40,6 +40,7 @@ var _spawn_acc := 0.0
 var _shake := 0.0
 var _pop_budget := 0
 var _hpm_t := 0.0
+var _next_elite := 90.0
 var cam_hold := false        ## capture/tools: keep the camera where it was put
 
 func _ready() -> void:
@@ -188,7 +189,7 @@ func start_run() -> void:
 	passives = {}
 	max_lives = 9 + Progress.mlv("m_life"); lives = max_lives
 	rerolls = Progress.mlv("m_reroll"); revives = Progress.mlv("m_revive")
-	pending_levels = 0; boss_spawned = false; wedding_done = false; won = false
+	pending_levels = 0; boss_spawned = false; wedding_done = false; won = false; _next_elite = 90.0
 	weapons.levels[ch.weapon] = 1
 	passives[ch.perk] = int(ch.get("perk_lv", 1))
 	if ch.perk == "bowl":
@@ -207,6 +208,7 @@ func _update_hp_mult() -> void:
 func _process(dt: float) -> void:
 	_place_cam(false, dt)
 	_pop_budget = 6
+	Fx.budget = 6
 	if phase != Phase.RUN:
 		return
 	if not boss_spawned:
@@ -216,6 +218,9 @@ func _process(dt: float) -> void:
 	if _hpm_t <= 0.0:
 		_hpm_t = 1.0; _update_hp_mult()
 	_director(dt)
+	if t >= _next_elite and not boss_spawned:
+		_next_elite += 60.0
+		_spawn_elite()
 	if not wedding_done and t >= RunDefs.WEDDING_AT:
 		_start_wedding()
 	if not boss_spawned and t >= RunDefs.NIGHT_SECONDS:
@@ -240,17 +245,22 @@ func _director(dt: float) -> void:
 			_spawn_one()
 
 func _roll_kind() -> int:
+	## Weighted pick among kinds unlocked by minute and stage; later kinds ramp in over a minute.
 	var minute := t / 60.0
-	var allowed: Array = RunDefs.STAGES[Progress.stage].kinds
-	if randf() < 0.015:
-		return MiceSwarm.Kind.VANG
-	var r := randf()
-	if "ma" in allowed and minute >= 3.0 and r < 0.12:
-		return MiceSwarm.Kind.MA
-	if "chu" in allowed and minute >= 1.5 and r < 0.25:
-		return MiceSwarm.Kind.CHU
-	if minute >= 1.0 and r < clampf(0.08 + 0.09 * minute, 0.0, 0.5):
-		return MiceSwarm.Kind.CONG
+	var total := 0.0
+	var pool := []
+	for k in MiceSwarm.KINDS:
+		var d: Dictionary = MiceSwarm.KINDS[k]
+		if d.w <= 0.0 or minute < d.from or Progress.stage < d.stage:
+			continue
+		var ramp := clampf(minute - d.from + 0.3, 0.3, 1.0) if d.from > 0.0 else 1.0
+		var w: float = d.w * ramp * (0.7 if k == MiceSwarm.Kind.NHAT and minute > 3.0 else 1.0)
+		pool.append([k, w]); total += w
+	var r := randf() * total
+	for e in pool:
+		r -= e[1]
+		if r <= 0.0:
+			return e[0]
 	return MiceSwarm.Kind.NHAT
 
 ## Mice appear in a ring just off-screen around the cat (survivors-style); edge holes as fallback.
@@ -262,6 +272,8 @@ func _spawn_one(near := false) -> void:
 		var p := player.global_position + Vector3(cos(a) * r, 0, sin(a) * r * 0.8)
 		if village.inside(p):
 			swarm.spawn(k, p)
+			if near and Fx.budget > 0:
+				Fx.budget -= 1; Fx.dirt(self, p)
 			return
 	swarm.spawn_at_random_hole(k)
 
@@ -281,6 +293,8 @@ func on_bite(dmg: int) -> void:
 	lives -= dmg
 	_invuln = 1.0
 	shake(0.35)
+	var n = swarm.nearest(player.global_position, 3.0)
+	player.hurt((player.global_position - n).normalized() if n != null else Vector3.ZERO)
 	sfx.play("click", 0.0, 0.5)
 	ui.hurt()
 	if lives <= 0:
@@ -305,13 +319,48 @@ func _on_killed(p: Vector3, kind: int) -> void:
 	rice.drop(p, float(d.xp))
 	var gain: float = float(d.fish) * fish_mult()
 	fish_run += gain
+	if Fx.budget > 0:
+		Fx.budget -= 1
+		Fx.death_flip(self, swarm.mesh_of(kind), swarm.material_of(kind), p, float(d.scale))
+		Fx.sparks(self, p + Vector3(0, 0.4, 0), d.color.lightened(0.3), 6, 5.0)
 	if _pop_budget > 0:
 		_pop_budget -= 1
-		Juice.burst(self, p, d.color)
 		sfx.play("pop", -10.0, 1.0 + randf() * 0.3)
+	# special deaths are deferred: we're inside the swarm's damage loop right now
+	if d.has("split"):
+		call_deferred("_split", p, int(d.split))
+	if d.has("blast"):
+		call_deferred("_lantern_blast", p)
+	if d.has("elite"):
+		Juice.popup(self, p + Vector3(0, 1.5, 0), "Hạ Chuột Tướng!", Color(1.0, 0.6, 0.4))
+		for k in 6: rice.drop(p + Vector3(randf_range(-1, 1), 0, randf_range(-1, 1)), 6.0)
+		Fx.ring(self, p, 4.0, Color(1.0, 0.6, 0.3)); shake(0.3)
+		if randf() < 0.5: _on_chest(p)
 	if kind == MiceSwarm.Kind.VANG:
 		Juice.popup(self, p + Vector3(0, 0.8, 0), "+" + BigNum.fmt(gain), Color(1.0, 0.85, 0.35))
 		Juice.fish(self, p)
+
+func _split(p: Vector3, n: int) -> void:
+	for k in n:
+		var a := k * TAU / n
+		swarm.spawn(MiceSwarm.Kind.NHAT, p + Vector3(cos(a), 0, sin(a)) * 0.8, 0.6)
+	Fx.smoke(self, p, Color(0.95, 0.75, 0.8), 6, 0.3)
+
+func _lantern_blast(p: Vector3) -> void:
+	# the paper lantern bursts and scorches other mice: a gift for the cat
+	Fx.fireball(self, p, 2.6)
+	Fx.confetti(self, p, 14)
+	Fx.flash(self, p, Color(1.0, 0.45, 0.2), 5.0, 8.0)
+	hit(p, 2.8, 45.0 * might(), Vector3.ZERO, TAU, 5.0)
+	sfx.play("pop", -4.0, 0.55)
+
+func _spawn_elite() -> void:
+	var a := randf() * TAU
+	var p := village.clamp_inside(player.global_position + Vector3(cos(a), 0, sin(a)) * 16.0)
+	swarm.spawn(MiceSwarm.Kind.TUONG, p, 1.0 + 0.6 * (t / 60.0))
+	Fx.dirt(self, p, 16); Fx.ring(self, p, 3.0, Color(1.0, 0.4, 0.3))
+	ui.banner("Chuột Tướng xuất trận!")
+	sfx.play("whoosh", -2.0, 0.6)
 
 func _on_rice(v: float) -> void:
 	xp += v * (1.0 + 0.1 * Progress.mlv("m_growth"))
@@ -320,6 +369,7 @@ func _on_rice(v: float) -> void:
 		level += 1
 		xp_next = RunDefs.xp_to_next(level)
 		pending_levels += 1
+		Fx.beam(self, player.global_position)
 
 func shake(v: float) -> void:
 	_shake = minf(_shake + v, 0.7)

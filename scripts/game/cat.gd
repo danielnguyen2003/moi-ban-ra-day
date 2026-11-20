@@ -46,6 +46,9 @@ var _legs: Array[Node3D] = []
 var _tail: Array[Node3D] = []
 var _eyes: Array[Node3D] = []
 var _ears: Array[Node3D] = []
+var _hurt_t := 0.0
+var _trail: Node3D
+var _last_step := 0.0
 var _ai_target := Vector3.ZERO
 var _ai_t := 0.0
 
@@ -86,6 +89,7 @@ func charges_left() -> int:
 func _build() -> void:
 	_rig = Node3D.new(); add_child(_rig)
 	_rig.scale = Vector3.ONE * size
+	_rig.add_child(Fx.blob_shadow(1.5))
 	_body = Node3D.new(); _body.position.y = 0.55; _rig.add_child(_body)
 	var tabby := {"stripes": 14.0 if striped else 0.0, "stripe_color": stripe, "stripe_axis": Vector3(0, 0, 1)}
 	_body.add_child(Toon.part(Toon.sphere(0.5), fur, Vector3.ZERO, Vector3(1.0, 0.85, 1.35), true, tabby))
@@ -121,6 +125,13 @@ func _build() -> void:
 		# blush
 		_head.add_child(Toon.part(Toon.sphere(0.08), Color(1.0, 0.6, 0.65), Vector3(0.36 * sx, -0.15, -0.42), Vector3(1.2, 0.6, 0.4), false))
 	_head.add_child(Toon.part(Toon.sphere(0.06), Color(0.95, 0.5, 0.6), Vector3(0, -0.12, -0.6), Vector3(1.3, 0.9, 1), false))
+	for sx in [-1.0, 1.0]:   # cheek fluff
+		var f := Toon.part(Toon.cone(0.16, 0.3, 5), fur, Vector3(0.55 * sx, -0.12, -0.05), Vector3(1, 1, 0.6), true)
+		f.rotation.z = -sx * 1.9
+		_head.add_child(f)
+	var chest := Toon.part(Toon.cone(0.22, 0.34, 6), belly, Vector3(0, 0.12, -0.62), Vector3(1.2, 1, 0.6), false)
+	chest.rotation.x = PI
+	_body.add_child(chest)
 	_add_hat()
 	for p in [Vector3(-0.28, 0.0, -0.38), Vector3(0.28, 0.0, -0.38), Vector3(-0.28, 0.0, 0.38), Vector3(0.28, 0.0, 0.38)]:
 		var hip := Node3D.new(); hip.position = p + Vector3(0, -0.15, 0); _body.add_child(hip)
@@ -182,12 +193,20 @@ func _physics_process(dt: float) -> void:
 		if _windup <= 0.0:
 			_pounce_t = FLIGHT
 			pounced.emit()
+			if get_parent():
+				_trail = Fx.Trail.new(_body, Color(0.75, 0.95, 1.0), 0.45, 10)
+				get_parent().add_child(_trail)
 	elif _pounce_t > 0.0:
 		_pounce_t -= dt
 		velocity = _dir * (pounce_dist / FLIGHT)
 		if _pounce_t <= 0.0:
 			_squash = -0.4
 			landed.emit(global_position)
+			if get_parent():
+				Fx.ring(get_parent(), global_position, 1.6, Color(0.8, 0.95, 1.0), 0.25)
+			if is_instance_valid(_trail):
+				var tr := _trail
+				get_tree().create_timer(0.15).timeout.connect(func(): if is_instance_valid(tr): tr.queue_free())
 	else:
 		var target := move.limit_length(1.0) * speed
 		velocity = velocity.lerp(target, 1.0 - exp(-12.0 * dt))
@@ -203,6 +222,14 @@ func try_pounce() -> void:
 	_charges -= 1
 	_windup = WINDUP
 	_squash = 0.0
+
+## Called by the game when the cat is bitten: blink while invulnerable, hop, flash.
+func hurt(from_dir := Vector3.ZERO) -> void:
+	_hurt_t = 1.0
+	_squash = 0.45
+	velocity += from_dir * 6.0
+	if get_parent():
+		Fx.sparks(get_parent(), global_position + Vector3(0, 0.8, 0), Color(1.0, 0.35, 0.35), 10, 5.0)
 
 func _ai(dt: float) -> Vector3:
 	_ai_t -= dt
@@ -224,6 +251,16 @@ func _animate(dt: float) -> void:
 	var sp := Vector2(velocity.x, velocity.z).length()
 	var run01 := clampf(sp / maxf(speed, 0.1), 0.0, 1.0)
 	var now := Time.get_ticks_msec() * 0.001
+	# hurt: blink while invulnerable
+	if _hurt_t > 0.0:
+		_hurt_t -= dt
+		_rig.visible = int(_hurt_t * 14.0) % 2 == 0 or _hurt_t <= 0.0
+	# footstep dust on each stride
+	if run01 > 0.5 and not is_pouncing() and get_parent():
+		var st := sin(_phase)
+		if st > 0.0 and _last_step <= 0.0:
+			Fx.dirt(get_parent(), global_position - _dir * 0.4, 3)
+		_last_step = st
 	_phase += dt * (3.0 + sp * 1.6)
 	_rig.rotation.y = lerp_angle(_rig.rotation.y, atan2(-_dir.x, -_dir.z), 1.0 - exp(-16.0 * dt))
 	_rig.rotation.z = -_lean * run01
@@ -268,7 +305,9 @@ func _animate(dt: float) -> void:
 			var local := _rig.global_transform.basis.inverse() * to
 			look_y = clampf(atan2(-local.x, -local.z), -0.9, 0.9)
 	_head.rotation.y = lerp_angle(_head.rotation.y, look_y, 1.0 - exp(-8.0 * dt))
-	_head.rotation.x = -0.08 * run01 + sin(now * 2.0) * 0.04 + (sin(now * 7.0) * 0.12 if sit > 0.9 else 0.0)
+	var yawn := clampf(sin((_still_t - 4.0) * 1.6), 0.0, 1.0) if _still_t > 4.0 and _still_t < 6.0 else 0.0
+	_head.rotation.x = -0.08 * run01 + sin(now * 2.0) * 0.04 + (sin(now * 7.0) * 0.12 if sit > 0.9 else 0.0) - yawn * 0.5
+	_head.scale = Vector3.ONE * (1.0 + yawn * 0.06)
 	_head.rotation.z = sin(now * 1.3) * 0.08 * (1.0 - run01)
 	# blink
 	_blink_t -= dt

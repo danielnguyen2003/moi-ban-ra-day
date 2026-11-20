@@ -76,38 +76,16 @@ func _fire(id: String, s: Dictionary) -> void:
 
 # ---------------------------------------------------------------- claw
 func _slash_fx(at: Vector3, dir: Vector3, r: float, arc: float, evo: bool) -> void:
-	var mi := MeshInstance3D.new()
-	var t := TorusMesh.new(); t.inner_radius = r * 0.75; t.outer_radius = r; t.rings = 24; t.ring_segments = 4
-	mi.mesh = t
-	var m := StandardMaterial3D.new(); m.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
-	m.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
-	var col := Color(1.0, 0.75, 0.3) if evo else Color(1.0, 1.0, 1.0)
-	m.albedo_color = Color(col, 0.75); m.emission_enabled = true; m.emission = col; m.emission_energy_multiplier = 2.0
-	mi.material_override = m
-	game.add_child(mi)
-	mi.global_position = at + Vector3(0, 0.5, 0)
-	mi.scale = Vector3(1, 0.15, 1)
-	# three claw streaks instead of a full ring when it's an arc
-	if arc < TAU - 0.01:
-		mi.queue_free()
-		for k in 3:
-			var streak := MeshInstance3D.new()
-			var b := BoxMesh.new(); b.size = Vector3(0.08, 0.04, r * 0.9)
-			streak.mesh = b; streak.material_override = m
-			game.add_child(streak)
-			var side: Vector3 = dir.rotated(Vector3.UP, (k - 1) * 0.35)
-			streak.global_position = at + side * r * 0.55 + Vector3(0, 0.5, 0)
-			streak.look_at(streak.global_position + side, Vector3.UP)
-			streak.rotate_object_local(Vector3.UP, 0.5)
-			var tw := streak.create_tween().set_parallel(true)
-			tw.tween_property(streak, "scale", Vector3(1, 1, 1.4), 0.12)
-			tw.tween_property(streak, "transparency", 1.0, 0.18)
-			tw.chain().tween_callback(streak.queue_free)
+	if evo:
+		# Vuốt hổ: two full tiger-orange sweeps
+		Fx.slash(game, at, dir, r * 0.95, TAU * 0.98, Color(1.0, 0.55, 0.15), 0.6, 0.22)
+		Fx.slash(game, at, -dir, r * 0.7, TAU * 0.98, Color(1.0, 0.85, 0.4), 0.4, 0.18)
+		Fx.sparks(game, at + Vector3(0, 0.5, 0), Color(1.0, 0.7, 0.3), 14, 7.0)
 		return
-	var tw := mi.create_tween().set_parallel(true)
-	tw.tween_property(mi, "rotation:y", TAU, 0.2)
-	tw.tween_property(mi, "transparency", 1.0, 0.22)
-	tw.chain().tween_callback(mi.queue_free)
+	# three parallel claw crescents, slightly tilted like a real swipe
+	for k in 3:
+		Fx.slash(game, at, dir.rotated(Vector3.UP, (k - 1) * 0.12), r * (0.75 + 0.12 * k), arc * 0.9, Color(1.0, 0.95, 0.8).lerp(Color(1.0, 0.75, 0.4), k * 0.4), 0.28, 0.16, (k - 1) * 0.15)
+	Fx.sparks(game, at + dir * r * 0.7 + Vector3(0, 0.5, 0), Color(1.0, 0.9, 0.6), 6, 5.0)
 
 # ---------------------------------------------------------------- lantern (orbit)
 func _make_star(color: Color) -> Node3D:
@@ -129,8 +107,10 @@ func _make_star(color: Color) -> Node3D:
 func _update_lanterns(dt: float, s: Dictionary) -> void:
 	var want: int = s.count
 	while _lanterns.size() < want:
-		var n := _make_star(Color(1.0, 0.35, 0.25) if _lanterns.size() % 2 == 0 else Color(1.0, 0.8, 0.25))
+		var col := Color(1.0, 0.35, 0.25) if _lanterns.size() % 2 == 0 else Color(1.0, 0.8, 0.25)
+		var n := _make_star(col)
 		game.add_child(n); _lanterns.append(n)
+		game.add_child(Fx.Trail.new(n, col, 0.22, 12))
 	while _lanterns.size() > want:
 		_lanterns.pop_back().queue_free()
 	_lantern_angle += dt * s.speed
@@ -144,7 +124,10 @@ func _update_lanterns(dt: float, s: Dictionary) -> void:
 	if _lantern_tick <= 0.0:
 		_lantern_tick = s.cd * cd_mult
 		for l in _lanterns:
-			game.hit(Vector3(l.global_position.x, 0, l.global_position.z), 0.75, s.dmg * might)
+			var lp := Vector3(l.global_position.x, 0, l.global_position.z)
+			if game.hit(lp, 0.85, s.dmg * might) > 0 and Fx.budget > 0:
+				Fx.budget -= 1
+				Fx.sparks(game, l.global_position, Color(1.0, 0.75, 0.3), 8, 5.0)
 
 # ---------------------------------------------------------------- projectiles
 func _throw_cracker(from: Vector3, to: Vector3, s: Dictionary) -> void:
@@ -155,6 +138,13 @@ func _throw_cracker(from: Vector3, to: Vector3, s: Dictionary) -> void:
 	fuse.position = Vector3(0.28, 0, 0); n.add_child(fuse)
 	game.add_child(n)
 	n.global_position = from + Vector3(0, 0.8, 0)
+	game.add_child(Fx.Trail.new(n, Color(1.0, 0.55, 0.2), 0.12, 10))
+	var fz := CPUParticles3D.new(); fz.amount = 16; fz.lifetime = 0.3; fz.spread = 180.0
+	fz.initial_velocity_min = 1.0; fz.initial_velocity_max = 2.5; fz.gravity = Vector3(0, -3, 0)
+	var sm := SphereMesh.new(); sm.radius = 0.03; sm.height = 0.06; sm.radial_segments = 4; sm.rings = 2
+	var smm := StandardMaterial3D.new(); smm.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED; smm.albedo_color = Color(1, 0.85, 0.4)
+	sm.material = smm; fz.mesh = sm; fz.position = Vector3(0.28, 0, 0)
+	n.add_child(fz)
 	_projectiles.append({"node": n, "kind": "cracker", "from": from, "to": to, "t": 0.0, "dur": 0.55, "s": s})
 
 func _spawn_yarn(at: Vector3, dir: Vector3, s: Dictionary, small := false) -> void:
@@ -162,6 +152,8 @@ func _spawn_yarn(at: Vector3, dir: Vector3, s: Dictionary, small := false) -> vo
 	var n := Toon.part(Toon.sphere(r), [Color(0.95, 0.45, 0.55), Color(0.4, 0.7, 0.95), Color(0.95, 0.8, 0.35)][randi() % 3], Vector3.ZERO, Vector3.ONE, true, {"stripes": 18.0, "stripe_color": Color(1, 1, 1, 1), "stripe_axis": Vector3(1, 1, 0)})
 	game.add_child(n)
 	n.global_position = at + Vector3(0, r, 0)
+	var thread := Fx.Trail.new(n, (n.material_override as ShaderMaterial).get_shader_parameter("albedo"), 0.05, 26)
+	game.add_child(thread)
 	_projectiles.append({"node": n, "kind": "yarn", "vel": dir * 9.0, "life": s.life, "tick": 0.0, "s": s, "r": r, "small": small})
 
 func _spawn_wisp(at: Vector3, target: Vector3, s: Dictionary) -> void:
@@ -171,6 +163,7 @@ func _spawn_wisp(at: Vector3, target: Vector3, s: Dictionary) -> void:
 	var l := OmniLight3D.new(); l.light_color = Color(0.45, 1.0, 0.95); l.light_energy = 0.8; l.omni_range = 3.0; n.add_child(l)
 	game.add_child(n)
 	n.global_position = at + Vector3(0, 1.4, 0)
+	game.add_child(Fx.Trail.new(n, Color(0.45, 1.0, 0.95), 0.18, 14))
 	_projectiles.append({"node": n, "kind": "wisp", "target": target, "s": s, "chain": s.chain, "life": 3.0})
 
 func _spawn_nia(at: Vector3, dir: Vector3, s: Dictionary) -> void:
@@ -179,8 +172,13 @@ func _spawn_nia(at: Vector3, dir: Vector3, s: Dictionary) -> void:
 	n.add_child(disc)
 	if evolved.get("nia", false):
 		disc.material_override = Toon.mat(Color(1.0, 0.82, 0.3), true, {"stripes": 40.0, "stripe_color": Color(0.85, 0.6, 0.2), "stripe_axis": Vector3(1, 0, 1)})
+	var blur := MeshInstance3D.new()
+	var tor := TorusMesh.new(); tor.inner_radius = 0.45; tor.outer_radius = 0.75; tor.rings = 24; tor.ring_segments = 4
+	blur.mesh = tor; blur.material_override = Fx.add_mat(Color(1.0, 0.85, 0.5), 0.8)
+	blur.scale = Vector3(1, 0.1, 1); n.add_child(blur)
 	game.add_child(n)
 	n.global_position = at + Vector3(0, 0.6, 0)
+	game.add_child(Fx.Trail.new(n, Color(1.0, 0.85, 0.5), 0.35, 8))
 	_projectiles.append({"node": n, "kind": "nia", "origin": at, "dir": dir.normalized(), "t": 0.0, "s": s, "tick": 0.0})
 
 func _update_projectiles(dt: float) -> void:
@@ -200,9 +198,11 @@ func _update_projectiles(dt: float) -> void:
 				if k >= 1.0:
 					_explode(p.to, p.s)
 					if p.s.cluster:
-						for c in 4:
-							var a := c * TAU / 4.0 + randf()
-							_explode(p.to + Vector3(cos(a), 0, sin(a)) * p.s.radius * 1.1, p.s, 0.6)
+						# Pháo hoa: a ring of coloured bursts
+						for c in 5:
+							var a := c * TAU / 5.0 + randf()
+							_explode(p.to + Vector3(cos(a), 0, sin(a)) * p.s.radius * 1.1, p.s, 0.6,
+								[Color(1.0, 0.3, 0.4), Color(0.4, 0.8, 1.0), Color(1.0, 0.85, 0.3), Color(0.6, 1.0, 0.5), Color(0.9, 0.5, 1.0)][c])
 					alive = false
 			"yarn":
 				p.life -= dt
@@ -238,6 +238,7 @@ func _update_projectiles(dt: float) -> void:
 					if p.chain > 0:
 						var nxt = game.swarm.nearest(p.target + Vector3(randf_range(-2, 2), 0, randf_range(-2, 2)), 6.0)
 						if nxt != null:
+							_bolt(p.target, nxt)
 							p.target = nxt; p.chain -= 1
 						else:
 							alive = false
@@ -265,9 +266,32 @@ func _update_projectiles(dt: float) -> void:
 			n.queue_free()
 	_projectiles = keep
 
-func _explode(at: Vector3, s: Dictionary, scale := 1.0) -> void:
+func _explode(at: Vector3, s: Dictionary, scale := 1.0, spark_col := Color(1.0, 0.6, 0.2)) -> void:
 	game.hit(at, s.radius * scale, s.dmg * might * scale, Vector3.ZERO, TAU, 4.0)
-	Juice.ring(game, at, s.radius * scale)
-	Juice.burst(game, at, Color(1.0, 0.55, 0.2))
+	Fx.fireball(game, at, s.radius * scale)
+	Fx.ring(game, at, s.radius * scale, Color(1.0, 0.6, 0.3))
+	Fx.sparks(game, at + Vector3(0, 0.5, 0), spark_col, 14, 8.0)
+	if Fx.budget > 0:
+		Fx.budget -= 1
+		Fx.confetti(game, at, 16)
+		Fx.smoke(game, at, Color(0.5, 0.45, 0.55), 5, 0.4)
+		Fx.flash(game, at, Color(1.0, 0.55, 0.25), 4.0, 7.0)
 	game.sfx.play("pop", -6.0, 0.6)
 	game.shake(0.12)
+
+## Zig-zag chain lightning between two points (evolved wisp).
+func _bolt(a: Vector3, b: Vector3) -> void:
+	var im := ImmediateMesh.new()
+	im.surface_begin(Mesh.PRIMITIVE_TRIANGLE_STRIP)
+	var n := 8
+	var dir := (b - a); var side := dir.cross(Vector3.UP).normalized()
+	for k in n + 1:
+		var u := float(k) / n
+		var p := a.lerp(b, u) + Vector3(0, 0.6, 0) + side * (randf_range(-0.35, 0.35) if k > 0 and k < n else 0.0)
+		im.surface_set_uv(Vector2(u, 0)); im.surface_add_vertex(p + Vector3(0, 0.07, 0))
+		im.surface_set_uv(Vector2(u, 1)); im.surface_add_vertex(p - Vector3(0, 0.07, 0))
+	im.surface_end()
+	var mi := MeshInstance3D.new(); mi.mesh = im
+	var m := Fx.add_mat(Color(0.5, 1.0, 1.0), 3.0, 1.0); mi.material_override = m
+	game.add_child(mi)
+	var tw := mi.create_tween(); tw.tween_method(func(v): m.set_shader_parameter("alpha", v), 1.0, 0.0, 0.2); tw.tween_callback(mi.queue_free)

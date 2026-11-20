@@ -111,9 +111,12 @@ func test_boss_spawns_at_5_minutes_and_win_unlocks_stage() -> void:
 
 func test_bot_plays_a_full_night() -> void:
 	# A simple bot: kite away from the nearest hostile, walk to rice, always take the first card.
-	Engine.time_scale = 8.0
+	Engine.time_scale = 2.0
 	var steps := 0
-	while game.phase != game.Phase.RESULT and steps < 4000:
+	var last: Vector3 = game.player.global_position
+	var stuck := 0
+	var side := 1.0
+	while game.phase != game.Phase.RESULT and steps < 30000:
 		steps += 1
 		if game.phase == game.Phase.LEVELUP:
 			game.pick_card(0)
@@ -124,6 +127,12 @@ func test_bot_plays_a_full_night() -> void:
 			dir = (p - threat).normalized()
 		elif game.rice.pos.size() > 0:
 			dir = (game.rice.pos[0] - p).normalized()
+		# slide sideways when pinned against a wall, jar or tree
+		stuck = stuck + 1 if p.distance_to(last) < 0.03 and dir != Vector3.ZERO else 0
+		if stuck > 3:
+			side = -side if stuck % 40 == 0 else side
+			dir = dir.rotated(Vector3.UP, side * PI / 2)
+		last = p
 		_steer(dir)
 		if randf() < 0.05: game.player.try_pounce()
 		await wait_physics_frames(1)
