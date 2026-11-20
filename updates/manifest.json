@@ -7,5 +7,13 @@
   },
   "base_pck": "base.pck",
   "base_sha256": "e3210faf9288f962e1b579d55272950a0c4127cbd56e47825ade440fa72a34cb",
-  "patches": []
+  "patches": [
+    {
+      "id": "p1",
+      "file": "patch-0001.pck",
+      "sha256": "017d0b488cebb7e0c4434f8d6116307f0eef19508509b9199e98e7a42e55adcc",
+      "size": 119460,
+      "notes": "v4: bản đồ gấp 5, 11 loại chuột mới, hiệu ứng kỹ năng và animation mèo mới"
+    }
+  ]
 }
