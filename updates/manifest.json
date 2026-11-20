@@ -14,6 +14,13 @@
       "sha256": "4c8df5b7f3560bca9053b69994012a2df8dc1296da36e52fe4bcc5f76829f372",
       "size": 83444,
       "notes": "v2.1: bản đồ to gấp 3, đêm 20s, chuột nhiều gấp 6-8, 17 nâng cấp, animation mới, skin"
+    },
+    {
+      "id": "p2",
+      "file": "patch-0002.pck",
+      "sha256": "84ae01a7d5be703e15daeafd9aae2d33d1bbcd8e0c7d2dcc1b10b84d9134f5eb",
+      "size": 83544,
+      "notes": "v3 Mèo Survivors: đêm 5 phút, 9 mạng, thẻ lên cấp, 6 vũ khí, tiến hóa, Đám cưới chuột, Chuột Chúa, 8 mèo, 5 màn"
     }
   ]
 }
