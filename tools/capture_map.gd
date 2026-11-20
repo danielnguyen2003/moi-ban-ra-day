@@ -2,7 +2,6 @@ extends Node
 ## Aerial tour of the village for visual review: godot --path . -- --no-save --capture-map <dir>
 
 const SHOTS := [
-	["m1_overview", Vector3(0, 150, 150), Vector3(0, 0, 0)],
 	["m2_home", Vector3(0, 22, 30), Vector3(0, 0, -4)],
 	["m3_fields", Vector3(60, 24, 20), Vector3(75, 0, -15)],
 	["m4_pond", Vector3(-55, 22, 35), Vector3(-78, 0, 5)],

@@ -45,16 +45,19 @@ void fragment() {
 		float n = noise(p * 0.9) * 0.5 + noise(p * 4.0) * 0.5;
 		c = mix(base_a.rgb, base_b.rgb, n);
 	} else {                   // nước ao: dark with moving moon glints
-		float n = noise(p * 1.5 + vec2(TIME * 0.2, TIME * 0.13));
-		c = mix(base_a.rgb, base_b.rgb, n);
+		float n = noise(p * 0.4 + vec2(TIME * 0.05, TIME * 0.03));
+		c = mix(base_a.rgb, base_b.rgb, n) * 0.7;
+		// moon path: soft ripples catching the light
+		float rip = sin(p.x * 2.3 + TIME * 1.2 + noise(p * 1.3) * 4.0) * sin(p.y * 1.7 - TIME * 0.9);
 		// sparse moon glints + a soft sheen; water stays dark so the shore reads
-		em = smoothstep(0.9, 0.93, noise(p * 3.5 - TIME * 0.25)) * 0.35 + 0.05 * n;
+		em = smoothstep(0.75, 0.95, rip) * 0.25 + smoothstep(0.93, 0.96, noise(p * 3.5 - TIME * 0.25)) * 0.3;
 	}
 	float edge = min(UV.x, 1.0 - UV.x);
 	float rag = noise(wpos.xz * 1.7) * 0.18;
 	ALPHA = smoothstep(0.0, 0.22 + rag, edge);
 	ALBEDO = c;
-	ROUGHNESS = mode == 4 ? 0.15 : 0.95;
+	ROUGHNESS = mode == 4 ? 0.7 : 0.95;
+	SPECULAR = mode == 4 ? 0.05 : 0.2;
 	EMISSION = vec3(0.7, 0.85, 1.0) * em;
 }
 
