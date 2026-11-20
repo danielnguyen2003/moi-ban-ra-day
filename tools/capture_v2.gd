@@ -31,14 +31,18 @@ func _ready() -> void:
 	await _shot(out, "02_cat_closeup")
 	# 3) mid-night action with a full build
 	g.swarm.frozen = false; g.swarm.clear(); g.cam_hold = false; g.ui.visible = true
+	g.lives = 99
 	g.won = true
+	g._invuln = 9999.0
 	g.weapons.levels = {"claw": 6, "lantern": 6, "cracker": 6, "wisp": 5}
 	g.weapons.evolved = {"cracker": true}
 	g.passives = {"might": 3, "bowl": 2}
 	g._apply_stats()
 	g.t = 170.0
 	for i in 90: g._spawn_one()
-	for i in 100: await tree.process_frame
+	for i in 100:
+		g._invuln = 9999.0
+		await tree.process_frame
 	await _shot(out, "03_action")
 	for i in 25: await tree.process_frame
 	await _shot(out, "04_action_b")

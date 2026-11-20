@@ -3,7 +3,7 @@ shader_type spatial;
 // 0 body · 1 feet A · 2 feet B · 3 tail · 4 ears · 5 wings · 6 rigid accessory.
 // INSTANCE_CUSTOM: x phase, y speed01, z hit flash, w scared.  Vertex alpha < 1 = emissive part.
 render_mode diffuse_toon, specular_disabled;
-uniform vec4 shade_color : source_color = vec4(0.3, 0.28, 0.5, 1.0);
+uniform vec4 shade_color : source_color = vec4(0.5, 0.46, 0.6, 1.0);   // lighter, more neutral shadows keep fur colours readable at night
 uniform vec4 rim_color : source_color = vec4(0.65, 0.8, 1.0, 1.0);
 uniform float hover = 0.0;      // ghosts and bats float
 varying float v_flash;
@@ -40,10 +40,10 @@ void vertex() {
 
 void fragment() {
 	vec3 c = mix(COLOR.rgb, vec3(1.0), v_flash * 0.85);
-	ALBEDO = c;
+	ALBEDO = c * 1.15;
 	ROUGHNESS = 0.85;
 	float rim = pow(1.0 - clamp(dot(NORMAL, VIEW), 0.0, 1.0), 3.0);
-	EMISSION = COLOR.rgb * (1.0 - COLOR.a) * 3.0 + rim_color.rgb * rim * 0.45 + vec3(1.0) * v_flash * 0.6;
+	EMISSION = COLOR.rgb * (1.0 - COLOR.a) * 3.0 + rim_color.rgb * rim * 0.3 + vec3(1.0) * v_flash * 0.6;
 }
 
 void light() {
