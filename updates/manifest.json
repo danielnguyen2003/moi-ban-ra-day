@@ -1,19 +1,11 @@
 {
-  "base": "m3.0",
-  "base_commit": "70761811a46bfc1b0e7f79273f6ba1c27fc5bcd3",
+  "base": "m4.0",
+  "base_commit": "afef17954c95bc4e5fdc0005bcc0a0e5ee50e5aa",
   "full": {
-    "windows": "MoiBanRaDay-m3.0-windows-x86_64.zip",
-    "linux": "MoiBanRaDay-m3.0-linux-x86_64.tar.gz"
+    "windows": "MoiBanRaDay-m4.0-windows-x86_64.zip",
+    "linux": "MoiBanRaDay-m4.0-linux-x86_64.tar.gz"
   },
   "base_pck": "base.pck",
-  "base_sha256": "e3210faf9288f962e1b579d55272950a0c4127cbd56e47825ade440fa72a34cb",
-  "patches": [
-    {
-      "id": "p1",
-      "file": "patch-0001.pck",
-      "sha256": "017d0b488cebb7e0c4434f8d6116307f0eef19508509b9199e98e7a42e55adcc",
-      "size": 119460,
-      "notes": "v4: bản đồ gấp 5, 11 loại chuột mới, hiệu ứng kỹ năng và animation mèo mới"
-    }
-  ]
+  "base_sha256": "946f69775332b17399eb4436e764ebe75df183ec8dcd682c1b1a9c3e39154480",
+  "patches": []
 }
