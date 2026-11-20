@@ -42,11 +42,11 @@ const CHARACTERS := {
 
 ## Stages: start region, difficulty and rewards.
 const STAGES := [
-	{"name": "Sân nhà",      "start": Vector3(0, 0, 3),    "hp": 1.0, "rate": 1.0, "fish": 1.0, "boss_hp": 1200.0, "kinds": ["nhat", "cong"]},
-	{"name": "Vườn chuối",   "start": Vector3(38, 0, -10), "hp": 1.8, "rate": 1.2, "fish": 1.6, "boss_hp": 3000.0, "kinds": ["nhat", "cong", "chu"]},
-	{"name": "Ao làng",      "start": Vector3(-26, 0, 8),  "hp": 3.0, "rate": 1.35, "fish": 2.5, "boss_hp": 7000.0, "kinds": ["nhat", "cong", "chu"]},
-	{"name": "Đình làng",    "start": Vector3(0, 0, 30),   "hp": 4.8, "rate": 1.5, "fish": 4.0, "boss_hp": 15000.0, "kinds": ["nhat", "cong", "chu", "ma"]},
-	{"name": "Bãi tha ma",   "start": Vector3(0, 0, 62),   "hp": 7.5, "rate": 1.7, "fish": 6.5, "boss_hp": 32000.0, "kinds": ["nhat", "cong", "chu", "ma"]},
+	{"name": "Sân nhà",      "start": Vector3(0, 0, 4),    "hp": 1.0, "rate": 1.0, "fish": 1.0, "boss_hp": 1200.0, "kinds": ["nhat", "cong"]},
+	{"name": "Ruộng lúa",    "start": Vector3(75, 0, -15), "hp": 1.8, "rate": 1.2, "fish": 1.6, "boss_hp": 3000.0, "kinds": ["nhat", "cong", "chu"]},
+	{"name": "Ao làng",      "start": Vector3(-46, 0, 26),  "hp": 3.0, "rate": 1.35, "fish": 2.5, "boss_hp": 7000.0, "kinds": ["nhat", "cong", "chu"]},
+	{"name": "Đình làng",    "start": Vector3(0, 0, 66),   "hp": 4.8, "rate": 1.5, "fish": 4.0, "boss_hp": 15000.0, "kinds": ["nhat", "cong", "chu", "ma"]},
+	{"name": "Bãi tha ma",   "start": Vector3(0, 0, -80),   "hp": 7.5, "rate": 1.7, "fish": 6.5, "boss_hp": 32000.0, "kinds": ["nhat", "cong", "chu", "ma"]},
 ]
 
 ## Permanent upgrades bought with fish between nights (infinite levels, exponential cost).

@@ -31,7 +31,9 @@ func _ready() -> void:
 	InputMap.action_add_event("pounce", mb)
 	process_mode = Node.PROCESS_MODE_ALWAYS
 	load_game()
-	if "--capture" in OS.get_cmdline_user_args():
+	if "--capture-map" in OS.get_cmdline_user_args():
+		add_child.call_deferred(load("res://tools/capture_map.gd").new())
+	elif "--capture" in OS.get_cmdline_user_args():
 		add_child.call_deferred(load("res://tools/capture_v2.gd").new())
 
 func _bind(action: String, keys: Array) -> void:

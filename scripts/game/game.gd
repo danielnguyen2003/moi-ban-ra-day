@@ -40,6 +40,7 @@ var _spawn_acc := 0.0
 var _shake := 0.0
 var _pop_budget := 0
 var _hpm_t := 0.0
+var cam_hold := false        ## capture/tools: keep the camera where it was put
 
 func _ready() -> void:
 	randomize()
@@ -60,7 +61,7 @@ func _ready() -> void:
 	player.pounced.connect(func(): sfx.play("whoosh", -6.0))
 	player.landed.connect(_on_player_landed)
 	swarm.player = player; rice.player = player
-	cam = Camera3D.new(); cam.fov = 42.0; cam.far = 400.0; add_child(cam); cam.current = true
+	cam = Camera3D.new(); cam.fov = 42.0; cam.far = 1000.0; add_child(cam); cam.current = true
 	sfx = Sfx.new(); add_child(sfx)
 	ui = GameUI.new(); add_child(ui)
 	ui.process_mode = Node.PROCESS_MODE_ALWAYS
@@ -105,7 +106,7 @@ func _environment() -> void:
 	env.ambient_light_energy = 0.7
 	env.tonemap_mode = Environment.TONE_MAPPER_FILMIC
 	env.glow_enabled = true; env.glow_intensity = 0.9; env.glow_bloom = 0.12; env.glow_hdr_threshold = 0.9
-	env.fog_enabled = true; env.fog_light_color = Color(0.12, 0.1, 0.25); env.fog_density = 0.01; env.fog_sky_affect = 0.0
+	env.fog_enabled = true; env.fog_light_color = Color(0.12, 0.1, 0.25); env.fog_density = 0.006; env.fog_sky_affect = 0.0
 	env.ssao_enabled = true; env.ssao_radius = 1.2; env.ssao_intensity = 2.2
 	env.adjustment_enabled = true; env.adjustment_saturation = 1.15; env.adjustment_contrast = 1.05
 	we.environment = env
@@ -113,13 +114,13 @@ func _environment() -> void:
 	var moon := DirectionalLight3D.new()
 	moon.light_color = Color(0.62, 0.7, 1.0); moon.light_energy = 1.15
 	moon.rotation_degrees = Vector3(-55, -35, 0)
-	moon.shadow_enabled = true; moon.directional_shadow_max_distance = 60.0
+	moon.shadow_enabled = true; moon.directional_shadow_max_distance = 70.0
 	add_child(moon)
 	var fx := GPUParticles3D.new()
-	fx.amount = 220; fx.lifetime = 6.0; fx.preprocess = 6.0
+	fx.amount = 900; fx.lifetime = 6.0; fx.preprocess = 6.0
 	var pm := ParticleProcessMaterial.new()
 	pm.emission_shape = ParticleProcessMaterial.EMISSION_SHAPE_BOX
-	pm.emission_box_extents = Vector3(55, 1.5, 45)
+	pm.emission_box_extents = Vector3(120, 1.5, 130)
 	pm.gravity = Vector3.ZERO
 	pm.initial_velocity_min = 0.1; pm.initial_velocity_max = 0.4
 	pm.spread = 180.0
@@ -132,8 +133,8 @@ func _environment() -> void:
 	qm.billboard_mode = BaseMaterial3D.BILLBOARD_ENABLED; qm.albedo_color = Color(0.85, 1.0, 0.45)
 	qm.emission_enabled = true; qm.emission = Color(0.8, 1.0, 0.4); qm.emission_energy_multiplier = 4.0
 	q.material = qm; fx.draw_pass_1 = q
-	fx.position = Vector3(0, 1.5, 20)
-	fx.visibility_aabb = AABB(Vector3(-70, -5, -60), Vector3(140, 10, 120))
+	fx.position = Vector3(0, 1.5, 10)
+	fx.visibility_aabb = AABB(Vector3(-130, -5, -140), Vector3(260, 10, 280))
 	add_child(fx)
 
 func _apply_brightness(v: float) -> void:
@@ -464,6 +465,8 @@ func _end_run(victory: bool) -> void:
 
 # ---------------------------------------------------------------- camera
 func _place_cam(snap: bool, dt := 0.016) -> void:
+	if cam_hold:
+		return
 	var focus := player.global_position
 	var goal := focus + Vector3(0, 0, -1.0) + CAM_OFF
 	if snap:

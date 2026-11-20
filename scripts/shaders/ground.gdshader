@@ -46,7 +46,8 @@ void fragment() {
 	} else {                   // nước ao: dark with moving moon glints
 		float n = noise(p * 1.5 + vec2(TIME * 0.2, TIME * 0.13));
 		c = mix(base_a.rgb, base_b.rgb, n);
-		em = smoothstep(0.78, 0.82, noise(p * 2.5 - TIME * 0.3)) * 0.6;
+		// sparse moon glints + a soft sheen; water stays dark so the shore reads
+		em = smoothstep(0.9, 0.93, noise(p * 3.5 - TIME * 0.25)) * 0.35 + 0.05 * n;
 	}
 	ALBEDO = c;
 	ROUGHNESS = mode == 4 ? 0.15 : 0.95;
