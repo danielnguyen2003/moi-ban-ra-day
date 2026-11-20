@@ -7,5 +7,13 @@
   },
   "base_pck": "base.pck",
   "base_sha256": "946f69775332b17399eb4436e764ebe75df183ec8dcd682c1b1a9c3e39154480",
-  "patches": []
+  "patches": [
+    {
+      "id": "p1",
+      "file": "patch-0001.pck",
+      "sha256": "ee7264457e2e684ff3d8b412374bd671b84714f040a540987aaf4ca863d14a45",
+      "size": 66200,
+      "notes": "v4.1: cuộn len tự nhắm và nảy dây chuyền, cây cối lá thật, gió nhẹ, mái ngói âm dương, đường làng, mặt ao"
+    }
+  ]
 }
